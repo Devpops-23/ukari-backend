@@ -5,12 +5,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL is not set in the environment")
+DATABASE_URL = "sqlite:///./ukari.db"
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL, connect_args={"check_same_thread": False}
+)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
 
 SessionLocal = sessionmaker(
     autocommit=False,
