@@ -11,10 +11,16 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# CORS settings
+# -----------------------------
+# ✅ Corrected CORS Configuration
+# -----------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can restrict this later
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://ukari-frontend.vercel.app",  # for future deployment
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,4 +32,3 @@ app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 @app.get("/")
 def root():
     return {"message": "U-KARI backend running"}
-
