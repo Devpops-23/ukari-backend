@@ -1,53 +1,100 @@
-from auth.jwt_handler import create_token
-from passlib.context import CryptContext
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, timedelta
+import os
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
-from database import get_db
-from models import Traveler
 
-router = APIRouter(
-    prefix="/travelers",
-    tags=["Travelers"]
-)
+from db_utils.db import get_db
+from db_utils.models import Order, User
+from utils.auth import get_current_user
+from utils.fraud_engine import verify_delivery_photo, flag_order
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+router = APIRouter(prefix="/traveler", tags=["Traveler App"])
 
-@router.get("/")
-def list_travelers(db: Session = Depends(get_db)):
-    travelers = db.query(Traveler).all()
-    return travelers
 
-@router.post("/signup")
-def traveler_signup(name: str, email: str, password: str, db: Session = Depends(get_db)):
-    existing = db.query(Traveler).filter(Traveler.email == email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+@router.post("/order/{order_id}/arrived")
+def traveler_arrived(order_id: int, token: str, db: Session = Depends(get_db)):
+    traveler = get_current_user(db, token)
 
-    hashed = pwd_context.hash(password)
+    if traveler.role != "traveler":
+        raise HTTPException(status_code=403, detail="Traveler access only")
 
-    traveler = Traveler(
-        name=name,
-        email=email,
-        password_hash=hashed
+    order = (
+        db.query(Order)
+        .filter(Order.id == order_id, Order.traveler_id == traveler.id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found or unauthorized")
+
+    now = datetime.utcnow()
+
+    # Traveler arrival time
+    order.traveler_arrived_at = now
+
+    # 10-day delivery window starting tomorrow → 11 days from now at 23:59:59
+    order.delivery_deadline = (now + timedelta(days=11)).replace(
+        hour=23, minute=59, second=59, microsecond=0
     )
 
-    db.add(traveler)
     db.commit()
-    db.refresh(traveler)
-
-    return {"message": "Traveler created", "traveler_id": traveler.id}
-@router.post("/login")
-def traveler_login(email: str, password: str, db: Session = Depends(get_db)):
-    traveler = db.query(Traveler).filter(Traveler.email == email).first()
-    if not traveler:
-        raise HTTPException(status_code=404, detail="Traveler not found")
-
-    if not pwd_context.verify(password, traveler.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid password")
-
-    token = create_token(traveler.id)
+    db.refresh(order)
 
     return {
-        "access_token": token,
-        "traveler_id": traveler.id
+        "status": "success",
+        "message": "Arrival confirmed. 10-day delivery window starts tomorrow.",
+        "delivery_deadline": order.delivery_deadline.isoformat(),
     }
+
+
+@router.post("/order/{order_id}/delivered")
+async def traveler_mark_delivered(
+    order_id: int,
+    token: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    traveler = get_current_user(db, token)
+
+    if traveler.role != "traveler":
+        raise HTTPException(status_code=403, detail="Traveler access only")
+
+    order = (
+        db.query(Order)
+        .filter(Order.id == order_id, Order.traveler_id == traveler.id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found or unauthorized")
+
+    # Save delivery photo
+    os.makedirs("delivery_photos", exist_ok=True)
+    photo_path = os.path.join(
+        "delivery_photos",
+        f"delivery_{order.id}_{int(datetime.utcnow().timestamp())}.jpg",
+    )
+
+    with open(photo_path, "wb") as f:
+        f.write(await file.read())
+
+    # Verify delivery photo (fraud engine)
+    if not verify_delivery_photo(photo_path):
+        flag_order(db, order, "Invalid delivery photo")
+        raise HTTPException(
+            status_code=400, detail="Delivery photo verification failed"
+        )
+
+    # Mark order as delivered
+    order.delivered_at = datetime.utcnow()
+    order.status = "delivered"
+
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "status": "success",
+        "message": "Delivery marked as completed.",
+        "order_id": order.id,
+        "delivered_at": order.delivered_at.isoformat(),
+    }
+
