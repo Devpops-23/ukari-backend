@@ -1,14 +1,12 @@
-# routers/purchasing.py
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
 
 from db_utils.db import get_db
-from db_utils.models import Order
+from db_utils.models import User, Order, Trip, OrderEvent
 from utils.auth import get_current_user
-from utils.stripe_issuing import create_issuing_authorization, record_issuing_transaction
 
-router = APIRouter(prefix="/purchasing", tags=["Purchasing"])
+router = APIRouter()
+
 
 
 # ---------------------------------------------------------

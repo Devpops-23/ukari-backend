@@ -1,14 +1,24 @@
 import os
-import stripe
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env file
-load_dotenv()
+# Load .env from the project root
+BASE_DIR = Path(__file__).resolve().parent
+ENV_PATH = BASE_DIR / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
 
-# Stripe API Key
+# JWT
+SECRET = os.getenv("JWT_SECRET")
+ALGORITHM = "HS256"
+
+# Stripe
 STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
+print("DEBUG STRIPE KEY:", STRIPE_API_KEY)
+
 if not STRIPE_API_KEY:
     raise RuntimeError("STRIPE_API_KEY is not set")
 
-stripe.api_key = STRIPE_API_KEY
+
+
+
 

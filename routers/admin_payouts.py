@@ -1,11 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
-from db_utils.database import get_db
-from db_utils.models import Order, Trip
-from utils.auth import get_current_user
-from datetime import datetime
 
-router = APIRouter(prefix="/admin", tags=["Admin Payouts"])
+from db_utils.db import get_db
+from db_utils.models import User, Order, Trip, OrderEvent
+from utils.auth import get_current_user
+
+router = APIRouter()
+
+
+def require_admin(user: User):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
 
 
 # ---------------------------------------------------------

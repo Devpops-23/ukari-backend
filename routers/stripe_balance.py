@@ -1,44 +1,39 @@
-import os
+# routers/stripe_balance.py
+
 import stripe
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from dotenv import load_dotenv
-from database import get_db
-from models import Traveler
 
-load_dotenv()
+from db_utils.db import get_db
+from db_utils.models import User
+from utils.auth import get_current_user
 
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-
-router = APIRouter(prefix="/stripe", tags=["Stripe Balance"])
-
-
-def get_current_user(db: Session, token: str):
-    user = db.query(Traveler).filter(Traveler.access_token == token).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return user
+router = APIRouter(
+    prefix="/stripe/balance",
+    tags=["Stripe Balance"],
+)
 
 
-@router.get("/balance")
-def get_balance(token: str, db: Session = Depends(get_db)):
+@router.get("/")
+def get_balance(
+    token: str,
+    db: Session = Depends(get_db)
+):
     user = get_current_user(db, token)
 
+    if user.role != "traveler":
+        raise HTTPException(status_code=403, detail="Only travelers can view Stripe balance")
+
     if not user.stripe_account_id:
-        return {
-            "available": 0,
-            "pending": 0,
-            "currency": "usd",
-        }
+        raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
 
-    balance = stripe.Balance.retrieve(stripe_account=user.stripe_account_id)
-
-    available = balance["available"][0]["amount"] / 100
-    pending = balance["pending"][0]["amount"] / 100
-    currency = balance["available"][0]["currency"]
+    try:
+        balance = stripe.Balance.retrieve(stripe_account=user.stripe_account_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
 
     return {
-        "available": available,
-        "pending": pending,
-        "currency": currency,
+        "available": balance["available"],
+        "pending": balance["pending"],
     }
+

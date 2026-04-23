@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
-from database import get_db
-from db_utils.models import Traveler, Order
 
-router = APIRouter(prefix="/earnings", tags=["Earnings Summary"])
+from db_utils.db import get_db
+from db_utils.models import User, Order, Trip, OrderEvent
+from utils.auth import get_current_user
+
+router = APIRouter()
+
 
 
 def get_current_user(db: Session, token: str):

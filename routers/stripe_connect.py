@@ -1,56 +1,100 @@
-from fastapi import APIRouter, Depends, HTTPException
+import stripe
+from config import STRIPE_API_KEY
+
+stripe.api_key = STRIPE_API_KEY
+
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
 
 from db_utils.db import get_db
-from db_utils.models import User
-from auth.jwt_handler import decode_token
-from config import stripe
+from db_utils.models import User, Order, Trip, OrderEvent
+from utils.auth import get_current_user
 
-router = APIRouter(prefix="/stripe", tags=["Stripe Connect"])
-
-
-def get_user_from_token(db: Session, token: str) -> User:
-    """Decode JWT and return the authenticated user."""
-    try:
-        payload = decode_token(token)
-        user_id = payload.get("user_id")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return user
+router = APIRouter()
 
 
-@router.post("/connect-link")
-def create_connect_link(token: str, db: Session = Depends(get_db)):
-    user = get_user_from_token(db, token)
+router = APIRouter(
+    prefix="/stripe/connect",
+    tags=["Stripe Connect"],
+)
+
+
+# ---------------------------------------------------------
+# CREATE STRIPE CONNECT ACCOUNT FOR TRAVELER
+# ---------------------------------------------------------
+@router.post("/create-account")
+def create_connect_account(token: str, db: Session = Depends(get_db)):
+    user = get_current_user(db, token)
 
     if user.role != "traveler":
-        raise HTTPException(status_code=403, detail="Only travelers can onboard")
+        raise HTTPException(status_code=403, detail="Only travelers can create Stripe accounts")
 
-    # Create Stripe account if missing
-    if not user.stripe_account_id:
+    try:
         account = stripe.Account.create(
             type="express",
             country="US",
             email=user.email,
-            capabilities={"transfers": {"requested": True}},
+            capabilities={
+                "transfers": {"requested": True},
+            },
         )
-        user.stripe_account_id = account.id
-        db.commit()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
 
-    # Create onboarding link
-    link = stripe.AccountLink.create(
-        account=user.stripe_account_id,
-        refresh_url="https://yourapp.com/onboarding/refresh",
-        return_url="https://yourapp.com/onboarding/complete",
-        type="account_onboarding",
-    )
+    user.stripe_account_id = account.id
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "status": "success",
+        "account_id": account.id,
+    }
+
+
+# ---------------------------------------------------------
+# GENERATE ONBOARDING LINK
+# ---------------------------------------------------------
+@router.get("/onboarding-link")
+def get_onboarding_link(token: str, db: Session = Depends(get_db)):
+    user = get_current_user(db, token)
+
+    if not user.stripe_account_id:
+        raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
+
+    try:
+        link = stripe.AccountLink.create(
+            account=user.stripe_account_id,
+            refresh_url="https://ukari.app/stripe/refresh",
+            return_url="https://ukari.app/stripe/return",
+            type="account_onboarding",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
 
     return {"url": link.url}
+
+
+# ---------------------------------------------------------
+# CHECK ACCOUNT STATUS
+# ---------------------------------------------------------
+@router.get("/status")
+def get_connect_status(token: str, db: Session = Depends(get_db)):
+    user = get_current_user(db, token)
+
+    if not user.stripe_account_id:
+        raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
+
+    try:
+        account = stripe.Account.retrieve(user.stripe_account_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
+
+    return {
+        "charges_enabled": account.charges_enabled,
+        "payouts_enabled": account.payouts_enabled,
+        "details_submitted": account.details_submitted,
+    }
+
 
 
 

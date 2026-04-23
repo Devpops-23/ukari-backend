@@ -1,94 +1,82 @@
-from datetime import datetime
-import json
-from fastapi import APIRouter, Request, HTTPException
+# routers/stripe_webhook.py
+
+import os
+import stripe
+from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.orm import Session
 
 from db_utils.db import get_db
-from db_utils.models import User, Order
-from config import stripe
-import os
+from db_utils.models import Order, User
+from utils.event_logger import log_event
 
 router = APIRouter(
     prefix="/internal/stripe",
     tags=["Stripe Webhooks"],
-    include_in_schema=False
 )
 
 WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 
 
-@router.post("/webhook")
+@router.post("/webhook", include_in_schema=False)
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
-    # Verify signature
     try:
         event = stripe.Webhook.construct_event(
             payload=payload,
             sig_header=sig_header,
-            secret=WEBHOOK_SECRET
+            secret=WEBHOOK_SECRET,
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Webhook signature failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Webhook error: {str(e)}")
 
     event_type = event["type"]
-    data = event["data"]["object"]
 
     # ---------------------------------------------------------
-    # 1. CONNECT ACCOUNT UPDATES (KYC, verification, etc.)
+    # HANDLE CHARGEBACKS
     # ---------------------------------------------------------
-    if event_type == "account.updated":
-        account_id = data["id"]
-        user = db.query(User).filter(User.stripe_account_id == account_id).first()
+    if event_type == "charge.dispute.created":
+        dispute = event["data"]["object"]
+        order_id = dispute["metadata"].get("ukari_order_id")
 
-        if user:
-            # Example: mark account as verified
-            if data.get("charges_enabled") and data.get("payouts_enabled"):
-                user.account_verified = True
-            else:
-                user.account_verified = False
+        if order_id:
+            order = db.query(Order).filter(Order.id == order_id).first()
+            if order:
+                buyer = db.query(User).filter(User.id == order.buyer_id).first()
+                if buyer:
+                    buyer.chargeback_count += 1
+                    db.commit()
 
-            db.commit()
+                order.status = "disputed"
+                db.commit()
 
-    # ---------------------------------------------------------
-    # 2. PAYOUT SUCCEEDED
-    # ---------------------------------------------------------
-    elif event_type == "payout.paid":
-        payout_id = data["id"]
-        amount = data["amount"]
-        account_id = data["stripe_account"]
-
-        user = db.query(User).filter(User.stripe_account_id == account_id).first()
-        if user:
-            print(f"Payout {payout_id} succeeded for traveler {user.id}")
+                log_event(
+                    db=db,
+                    order_id=order.id,
+                    event_type="chargeback",
+                    description="Stripe dispute opened by buyer",
+                )
 
     # ---------------------------------------------------------
-    # 3. PAYOUT FAILED
+    # HANDLE REFUNDS
     # ---------------------------------------------------------
-    elif event_type == "payout.failed":
-        payout_id = data["id"]
-        account_id = data["stripe_account"]
+    if event_type == "charge.refunded":
+        refund = event["data"]["object"]
+        order_id = refund["metadata"].get("ukari_order_id")
 
-        user = db.query(User).filter(User.stripe_account_id == account_id).first()
-        if user:
-            print(f"Payout FAILED for traveler {user.id}")
-            # You can notify traveler or flag account
+        if order_id:
+            order = db.query(Order).filter(Order.id == order_id).first()
+            if order:
+                order.status = "refunded"
+                db.commit()
 
-    # ---------------------------------------------------------
-    # 4. TRANSFER (EARNINGS) CREATED
-    # ---------------------------------------------------------
-    elif event_type == "transfer.created":
-        transfer = data
-        order = db.query(Order).filter(Order.stripe_transfer_id == transfer["id"]).first()
-
-        if order:
-            order.paid_at = datetime.utcnow()
-            db.commit()
+                log_event(
+                    db=db,
+                    order_id=order.id,
+                    event_type="refund",
+                    description="Stripe refund processed",
+                )
 
     return {"status": "success"}
 
-buyer.chargeback_count += 1
-
-if buyer.chargeback_count >= 2:
-    buyer.status = "banned"

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
 
-from db_utils.db import get_db
-from db_utils.models import Order, Trip, User
+
+from db_utils.models import User, Order, Trip, OrderEvent
+from utils.auth import get_current_user
+
 
 router = APIRouter(prefix="/realtime", tags=["Real-Time Matching"])
 

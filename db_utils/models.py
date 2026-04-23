@@ -1,3 +1,5 @@
+# db_utils/models.py
+
 from datetime import datetime
 
 from sqlalchemy import (
@@ -25,16 +27,23 @@ class User(Base):
 
     # Basic identity
     email = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=False)
     password_hash = Column(String, nullable=False)
 
     # Role: buyer, traveler, admin
     role = Column(String, default="buyer")
 
-    # Auth token (optional)
+    # Auth token (optional, legacy)
     access_token = Column(String, nullable=True, index=True)
 
-    # Stripe Connect account ID (for traveler payouts)
-    stripe_account_id = Column(String, nullable=True)
+    # Contact
+    phone = Column(String, nullable=True)
+
+    # Stripe
+    stripe_account_id = Column(String, nullable=True)       # traveler payouts
+    stripe_customer_id = Column(String, nullable=True)      # buyer charges
+    default_payment_method = Column(String, nullable=True)  # traveler liability charges
+    account_verified = Column(Boolean, default=False)
 
     # Traveler shipping address (for marketplace shipments)
     shipping_address_line1 = Column(String, nullable=True)
@@ -43,6 +52,21 @@ class User(Base):
     shipping_state = Column(String, nullable=True)
     shipping_postal_code = Column(String, nullable=True)
     shipping_country = Column(String, nullable=True)
+
+    # Performance / reliability
+    rating = Column(Float, default=0.0)
+    reliability_score = Column(Float, default=100.0)
+    on_time_deliveries = Column(Integer, default=0)
+    late_deliveries = Column(Integer, default=0)
+    cancellation_count = Column(Integer, default=0)
+    flight_cancel_count = Column(Integer, default=0)
+
+    # Buyer fraud counters
+    chargeback_count = Column(Integer, default=0)
+    return_count = Column(Integer, default=0)
+
+    # Account status: active, suspended, banned
+    status = Column(String, default="active")
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -60,30 +84,14 @@ class User(Base):
         back_populates="buyer",
     )
 
-# Order model
-flagged = Column(Boolean, default=False)
-
-# User model
-cancellation_count = Column(Integer, default=0)
-flight_cancel_count = Column(Integer, default=0)
-
-# Buyer fraud counters
-chargeback_count = Column(Integer, default=0)
-return_count = Column(Integer, default=0)
-
-# Account status
-status = Column(String, default="active")  # active, suspended, banned
 
 # ---------------------------------------------------------
-# ORDER MODEL (EXTENDED FOR MARKETPLACE + SHIPMENT FLOW)
+# ORDER MODEL (MARKETPLACE + SHIPMENT + DELIVERY + PAYOUT)
 # ---------------------------------------------------------
 class Order(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)
-
-    # Traveler accepts order
-    accepted_at = Column(DateTime, nullable=True)
 
     # Relationships
     trip_id = Column(Integer, ForeignKey("trips.id"), nullable=True)
@@ -96,43 +104,48 @@ class Order(Base):
     product_source = Column(String, nullable=True)  # amazon, walmart, macys, costco
     product_url = Column(Text, nullable=True)
     product_sku = Column(String, nullable=True)
+    store_name = Column(String, nullable=True)
+    item_name = Column(String, nullable=True)
 
     # Pricing breakdown
-    item_price = Column(Float, nullable=True)
-    platform_fee = Column(Float, nullable=True)
-    traveler_fee = Column(Float, nullable=True)
-    total_charged = Column(Float, nullable=True)
+    item_price = Column(Float, nullable=True)       # marketplace item price
+    platform_fee = Column(Float, nullable=True)     # U-KARI fee
+    traveler_fee = Column(Float, nullable=True)     # traveler earnings per order
+    total_charged = Column(Float, nullable=True)    # total charged to buyer
+
+    # Legacy / convenience amount used in some routers (earnings, admin)
+    amount = Column(Float, nullable=True)
 
     # -----------------------------
     # Purchase lifecycle
     # -----------------------------
-    purchase_status = Column(String, default="pending")  # pending, purchased, failed
-    purchase_reference = Column(String, nullable=True)   # Amazon/Walmart order ID
+    purchase_status = Column(
+        String,
+        default="pending",
+    )  # pending, in_progress, completed, failed
+    purchase_reference = Column(String, nullable=True)  # Amazon/Walmart order ID
 
     # -----------------------------
     # Shipment to traveler
     # -----------------------------
-    shipment_status = Column(String, default="not_shipped")  # not_shipped, in_transit, delivered_to_traveler
+    shipment_status = Column(
+        String,
+        default="not_shipped",
+    )  # not_shipped, in_transit, delivered_to_traveler
     shipment_tracking_number = Column(String, nullable=True)
     shipment_carrier = Column(String, nullable=True)
     traveler_received_at = Column(DateTime, nullable=True)
 
-    status = Column(String, default="pending")  
-    # Add these new statuses:
-    # flight_cancelled, returned_to_store, refund_received, reordered, rerouted
-
     # -----------------------------
     # Delivery to final recipient
     # -----------------------------
-    amount = Column(Float, nullable=False)
-    store_name = Column(String, nullable=True)
-    item_name = Column(String, nullable=True)
     pickup_location = Column(String, nullable=True)
     delivery_location = Column(String, nullable=True)
 
-    # Status lifecycle:
-    # pending → accepted → delivered → buyer_confirmed → paid
-    # disputed (can occur after delivered)
+    # Status lifecycle (high-level):
+    # pending → accepted → in_transit → delivered → buyer_confirmed → paid
+    # plus: disputed, refunded, failed, frozen, flight_cancelled,
+    # returned_to_store, refund_received, reordered, rerouted, auto_refunded
     status = Column(String, default="pending")
 
     # Delivery proof
@@ -140,7 +153,7 @@ class Order(Base):
 
     # Dispute fields
     dispute_reason = Column(Text, nullable=True)
-    dispute_status = Column(String, default=None)  # open, resolved, rejected
+    dispute_status = Column(String, nullable=True)  # open, resolved, rejected, auto_refunded
     dispute_created_at = Column(DateTime, nullable=True)
 
     # Stripe payout tracking
@@ -149,8 +162,17 @@ class Order(Base):
     # Earnings (for traveler)
     amount_earned = Column(Float, default=0.0)
 
+    # Enforcement / deadlines
+    traveler_arrived_at = Column(DateTime, nullable=True)
+    delivery_deadline = Column(DateTime, nullable=True)
+    refunded_at = Column(DateTime, nullable=True)
+
+    # Fraud flag
+    flagged = Column(Boolean, default=False)
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
+    accepted_at = Column(DateTime, nullable=True)
     delivered_at = Column(DateTime, nullable=True)
     buyer_confirmed_at = Column(DateTime, nullable=True)
     paid_at = Column(DateTime, nullable=True)
@@ -159,7 +181,12 @@ class Order(Base):
     trip = relationship("Trip", back_populates="orders")
     traveler = relationship("User", foreign_keys=[traveler_id], back_populates="traveler_orders")
     buyer = relationship("User", foreign_keys=[buyer_id], back_populates="buyer_orders")
+    events = relationship("OrderEvent", back_populates="order", cascade="all, delete-orphan")
 
+
+# ---------------------------------------------------------
+# ORDER EVENT MODEL (TIMELINE + LOGS)
+# ---------------------------------------------------------
 class OrderEvent(Base):
     __tablename__ = "order_events"
 
@@ -169,16 +196,8 @@ class OrderEvent(Base):
     description = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    order = relationship("Order", backref="events")
-    traveler_arrived_at = Column(DateTime, nullable=True)
-    delivery_deadline = Column(DateTime, nullable=True)
+    order = relationship("Order", back_populates="events")
 
-# Order model
-flagged = Column(Boolean, default=False)
-
-# User model
-cancellation_count = Column(Integer, default=0)
-flight_cancel_count = Column(Integer, default=0)
 
 # ---------------------------------------------------------
 # TRIP MODEL
@@ -190,6 +209,8 @@ class Trip(Base):
 
     # Traveler who owns this trip
     traveler_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Capacity
     max_weight = Column(Float, nullable=True)
 
     # Trip details
@@ -210,6 +231,7 @@ class Trip(Base):
     # Relationships
     orders = relationship("Order", back_populates="trip")
     traveler = relationship("User", back_populates="trips")
+
 
 
 

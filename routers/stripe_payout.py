@@ -1,48 +1,58 @@
-import os
+# routers/stripe_payout.py
+
 import stripe
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from dotenv import load_dotenv
-from database import get_db
-from models import Traveler
 
-load_dotenv()
+from db_utils.db import get_db
+from db_utils.models import User
+from utils.auth import get_current_user
 
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-
-router = APIRouter(prefix="/stripe", tags=["Stripe Payouts"])
-
-
-def get_current_user(db: Session, token: str):
-    user = db.query(Traveler).filter(Traveler.access_token == token).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return user
+router = APIRouter(
+    prefix="/stripe/payout",
+    tags=["Stripe Payout"],
+)
 
 
-@router.post("/payout")
-def create_payout(token: str, db: Session = Depends(get_db)):
+@router.post("/")
+def create_payout(
+    token: str,
+    db: Session = Depends(get_db)
+):
     user = get_current_user(db, token)
 
+    if user.role != "traveler":
+        raise HTTPException(status_code=403, detail="Only travelers can request payouts")
+
     if not user.stripe_account_id:
-        raise HTTPException(status_code=400, detail="Stripe account not connected")
+        raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
 
-    # Fetch balance
-    balance = stripe.Balance.retrieve(stripe_account=user.stripe_account_id)
-    available = balance["available"][0]["amount"]
+    try:
+        balance = stripe.Balance.retrieve(stripe_account=user.stripe_account_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
 
-    if available <= 0:
-        raise HTTPException(status_code=400, detail="No available balance to withdraw")
+    available = [b for b in balance["available"] if b["currency"] == "usd"]
+    if not available or available[0]["amount"] <= 0:
+        raise HTTPException(status_code=400, detail="No available balance to pay out")
 
-    # Create payout
-    payout = stripe.Payout.create(
-        amount=available,
-        currency=balance["available"][0]["currency"],
-        stripe_account=user.stripe_account_id,
-    )
+    amount = available[0]["amount"]
+
+    try:
+        payout = stripe.Payout.create(
+            amount=amount,
+            currency="usd",
+            method="standard",
+            stripe_account=user.stripe_account_id,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Payout failed: {str(e)}")
 
     return {
         "status": "success",
-        "payout_id": payout["id"],
-        "amount": available / 100,
+        "amount": amount,
+        "currency": "usd",
+        "payout_id": payout.id,
     }
+
+

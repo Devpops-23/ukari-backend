@@ -2,8 +2,10 @@ from jose import jwt
 from datetime import datetime, timedelta
 from os import getenv
 
-SECRET = getenv("JWT_SECRET")
+SECRET = "supersecretkey123"
 ALGORITHM = "HS256"
+print("SECRET:", repr(SECRET))
+
 
 def create_token(traveler_id: int):
     payload = {
