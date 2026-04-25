@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 from db_utils.db import get_db
 from db_utils.models import User, Order, Trip
 from schemas import TravelerOut, TripOut, OrderOut
-from auth import get_current_traveler
+from auth.auth_router import get_current_traveler
+from auth.auth_router import get_current_traveler
+
 
 router = APIRouter(
     prefix="/traveler",
