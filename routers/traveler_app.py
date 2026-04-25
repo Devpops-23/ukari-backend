@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db_utils.db import get_db
-from models import Traveler, Order, Trip
+from db_utils.models import Traveler, Order, Trip
 from schemas import TravelerOut, TripOut, OrderOut
 from auth import get_current_traveler
 
