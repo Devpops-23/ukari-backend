@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db_utils.db import get_db
-from db_utils.models import Traveler, Order, Trip
+from db_utils.models import User, Order, Trip
 from schemas import TravelerOut, TripOut, OrderOut
 from auth import get_current_traveler
 
@@ -15,7 +15,7 @@ router = APIRouter(
 # ---------------------------------------------------------
 @router.get("/dashboard")
 def traveler_dashboard(
-    traveler: Traveler = Depends(get_current_traveler),
+    traveler: User = Depends(get_current_traveler),
     db: Session = Depends(get_db)
 ):
     active_trips = db.query(Trip).filter(
