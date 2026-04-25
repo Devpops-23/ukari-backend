@@ -72,7 +72,14 @@ def get_order(
 ):
     order = db.query(Order).filter(
         Order.id == order_id,
-        Order.traveler_id == traveler
+        Order.traveler_id == traveler.id
+    ).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    return order
+
 
 
 
