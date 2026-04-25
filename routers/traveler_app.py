@@ -76,6 +76,7 @@ def traveler_earnings(
     return {
         "total_earned": total,
         "orders": serialized_orders
+    }    
 
 
 
