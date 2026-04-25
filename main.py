@@ -7,9 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 # -----------------------------
 # DATABASE INITIALIZATION
 # -----------------------------
-from db_utils.db import engine
-import db_utils.models  # <-- IMPORTANT: ensures models are registered
-from db_utils.models import Base
+from db_utils.db import engine, Base
+import db_utils.models  # <-- IMPORTANT: ensures ALL models are registered
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
@@ -78,5 +77,6 @@ app.include_router(traveler_app_router)
 @app.get("/")
 def root():
     return {"message": "U-KARI backend running"}
+
 
 

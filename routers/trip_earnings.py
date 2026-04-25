@@ -30,7 +30,8 @@ def get_trip_earnings(
 
     orders = db.query(Order).filter(Order.trip_id == trip.id).all()
 
-    total_earned = sum(o.amount_earned for o in orders if o.amount_earned)
+    traveler.earnings += orders.traveler_fee
+
 
     return {
         "trip_id": trip.id,

@@ -8,7 +8,6 @@ from schemas import TravelerOut, TripOut, OrderOut
 
 router = APIRouter()
 
-
 # ---------------------------------------------------------
 # GET CURRENT TRAVELER PROFILE
 # ---------------------------------------------------------
@@ -25,7 +24,12 @@ def get_my_trips(
     traveler: User = Depends(get_current_traveler),
     db: Session = Depends(get_db)
 ):
-    trips = db.query(Trip).filter(Trip.traveler_id == traveler.id).all()
+    trips = (
+        db.query(Trip)
+        .filter(Trip.traveler_id == traveler.id)
+        .order_by(Trip.id.desc())
+        .all()
+    )
     return trips
 
 
@@ -37,7 +41,12 @@ def get_my_orders(
     traveler: User = Depends(get_current_traveler),
     db: Session = Depends(get_db)
 ):
-    orders = db.query(Order).filter(Order.traveler_id == traveler.id).all()
+    orders = (
+        db.query(Order)
+        .filter(Order.traveler_id == traveler.id)
+        .order_by(Order.id.desc())
+        .all()
+    )
     return orders
 
 
@@ -79,6 +88,7 @@ def get_order(
         raise HTTPException(status_code=404, detail="Order not found")
 
     return order
+
 
 
 

@@ -1,22 +1,36 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from db_utils.db import get_db
-from db_utils.models import User, Order, Trip, OrderEvent
+from db_utils.models import User, Order
 from utils.auth import get_current_user
 
 router = APIRouter()
 
+# ---------------------------------------------------------
+# U-KARI FEE ENGINE (FLAT FEES)
+# ---------------------------------------------------------
 
-def require_admin(user: User):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+PLATFORM_FEE = 10.0
+TRAVELER_FEE = 25.0
+
+def calculate_fees(item_price: float):
+    platform_fee = PLATFORM_FEE
+    traveler_fee = TRAVELER_FEE
+    total_charged = item_price + platform_fee + traveler_fee
+
+    return {
+        "platform_fee": platform_fee,
+        "traveler_fee": traveler_fee,
+        "total_charged": total_charged
+    }
 
 
 # ---------------------------------------------------------
 # ADMIN AUTH CHECK
 # ---------------------------------------------------------
-def require_admin(user):
+def require_admin(user: User):
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
@@ -29,42 +43,44 @@ def get_all_payouts(token: str, db: Session = Depends(get_db)):
     user = get_current_user(db, token)
     require_admin(user)
 
-    # Fetch all orders that have been confirmed or paid
     orders = (
         db.query(Order)
-        .filter(Order.status.in_(["buyer_confirmed", "paid", "refunded"]))
+        .filter(Order.status.in_(["buyer_confirmed", "paid", "refunded", "frozen"]))
         .order_by(Order.id.desc())
         .all()
     )
 
     payouts = {}
-    for o in orders:
-        traveler_id = o.traveler_id or 0
 
-        if traveler_id not in payouts:
-            payouts[traveler_id] = {
-                "payout_id": traveler_id,
-                "traveler_name": f"User {traveler_id}",
+    for o in orders:
+        if not o.traveler_id:
+            continue
+
+        traveler = db.query(User).filter(User.id == o.traveler_id).first()
+
+        if o.traveler_id not in payouts:
+            payouts[o.traveler_id] = {
+                "traveler_id": o.traveler_id,
+                "traveler_name": traveler.email if traveler else "Unknown",
                 "amount": 0.0,
                 "status": "pending",
                 "stripe_transfer_id": None,
                 "orders": []
             }
 
-        payouts[traveler_id]["orders"].append({
+        payouts[o.traveler_id]["orders"].append({
             "order_id": o.id,
-            "amount": o.amount
+            "traveler_fee": o.traveler_fee
         })
 
-        payouts[traveler_id]["amount"] += o.amount
+        payouts[o.traveler_id]["amount"] += o.traveler_fee
 
-        # If any order has a Stripe transfer ID, attach it
         if o.stripe_transfer_id:
-            payouts[traveler_id]["stripe_transfer_id"] = o.stripe_transfer_id
-            payouts[traveler_id]["status"] = "paid"
+            payouts[o.traveler_id]["stripe_transfer_id"] = o.stripe_transfer_id
+            payouts[o.traveler_id]["status"] = "paid"
 
-        if o.status == "refunded":
-            payouts[traveler_id]["status"] = "frozen"
+        if o.status in ["refunded", "frozen"]:
+            payouts[o.traveler_id]["status"] = "frozen"
 
     return {"status": "success", "payouts": list(payouts.values())}
 
@@ -80,82 +96,8 @@ def get_payout_details(traveler_id: int, token: str, db: Session = Depends(get_d
     orders = (
         db.query(Order)
         .filter(Order.traveler_id == traveler_id)
-        .filter(Order.status.in_(["buyer_confirmed", "paid", "refunded"]))
+        .filter(Order.status.in_(["buyer_confirmed", "paid", "refunded", "frozen"]))
+        .order_by(Order.id.desc())
         .all()
-    )
-
-    if not orders:
-        raise HTTPException(status_code=404, detail="No payout found for traveler")
-
-    payout = {
-        "payout_id": traveler_id,
-        "traveler_name": f"User {traveler_id}",
-        "amount": sum(o.amount for o in orders),
-        "status": "pending",
-        "stripe_transfer_id": None,
-        "orders": [{"order_id": o.id, "amount": o.amount} for o in orders]
-    }
-
-    for o in orders:
-        if o.stripe_transfer_id:
-            payout["stripe_transfer_id"] = o.stripe_transfer_id
-            payout["status"] = "paid"
-
-        if o.status == "refunded":
-            payout["status"] = "frozen"
-
-    return {"status": "success", "payout": payout}
 
 
-# ---------------------------------------------------------
-# 3. APPROVE PAYOUT (Admin manually approves)
-# ---------------------------------------------------------
-@router.post("/payouts/{traveler_id}/approve")
-def approve_payout(traveler_id: int, token: str, db: Session = Depends(get_db)):
-    user = get_current_user(db, token)
-    require_admin(user)
-
-    orders = (
-        db.query(Order)
-        .filter(Order.traveler_id == traveler_id)
-        .filter(Order.status == "buyer_confirmed")
-        .all()
-    )
-
-    if not orders:
-        raise HTTPException(status_code=404, detail="No payout available to approve")
-
-    # Mark orders as paid
-    for o in orders:
-        o.status = "paid"
-        o.paid_at = datetime.utcnow()
-
-    db.commit()
-
-    return {"status": "success", "message": "Payout approved and marked as paid"}
-
-
-# ---------------------------------------------------------
-# 4. FREEZE PAYOUT (Admin freezes due to dispute)
-# ---------------------------------------------------------
-@router.post("/payouts/{traveler_id}/freeze")
-def freeze_payout(traveler_id: int, token: str, db: Session = Depends(get_db)):
-    user = get_current_user(db, token)
-    require_admin(user)
-
-    orders = (
-        db.query(Order)
-        .filter(Order.traveler_id == traveler_id)
-        .filter(Order.status.in_(["buyer_confirmed", "delivered"]))
-        .all()
-    )
-
-    if not orders:
-        raise HTTPException(status_code=404, detail="No payout available to freeze")
-
-    for o in orders:
-        o.status = "frozen"
-
-    db.commit()
-
-    return {"status": "success", "message": "Payout frozen due to dispute or admin action"}
