@@ -1,6 +1,7 @@
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from database import get_db
+from db_utils.db import get_db
 from models import Traveler, Order, Trip
 from schemas import TravelerOut, TripOut, OrderOut
 from auth import get_current_traveler
@@ -77,6 +78,17 @@ def traveler_earnings(
         "total_earned": total,
         "orders": serialized_orders
     }    
+=======
+export default function TravelerPage() {
+  return (
+    <div>
+      <h1>Traveler Dashboard</h1>
+      <p>This page is now valid and will build successfully.</p>
+    </div>
+  );
+}
+
+>>>>>>> 0143234 (Fix db imports)
 
 
 

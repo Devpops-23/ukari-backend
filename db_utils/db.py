@@ -1,5 +1,6 @@
 # db_utils/db.py
 
+from db_utils.db import get_db
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from datetime import datetime
