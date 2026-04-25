@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db_utils.db import get_db
@@ -62,7 +61,6 @@ def traveler_earnings(
 
     total = sum(o.amount_earned or 0 for o in orders)
 
-    # Serialize orders safely
     serialized_orders = [
         {
             "id": o.id,
@@ -77,18 +75,8 @@ def traveler_earnings(
     return {
         "total_earned": total,
         "orders": serialized_orders
-    }    
-=======
-export default function TravelerPage() {
-  return (
-    <div>
-      <h1>Traveler Dashboard</h1>
-      <p>This page is now valid and will build successfully.</p>
-    </div>
-  );
-}
+    }
 
->>>>>>> 0143234 (Fix db imports)
 
 
 
