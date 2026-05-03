@@ -1,55 +1,67 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from pydantic import BaseModel
+import os
 
 from db_utils.db import get_db
 from db_utils.models import User
-from auth.jwt_handler import create_token, decode_token
 
-router = APIRouter()
-security = HTTPBearer()
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
+# ---------------------------
+# JWT CONFIG
+# ---------------------------
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")  # Correct variable for your environment
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/auth/login")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-# ---------------------------------------------------------
-# PASSWORD HELPERS
-# ---------------------------------------------------------
+# ---------------------------
+# Pydantic Login Model
+# ---------------------------
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+# ---------------------------
+# Utility functions
+# ---------------------------
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-# ---------------------------------------------------------
-# AUTH SCHEMAS
-# ---------------------------------------------------------
-class SignupRequest(BaseModel):
-    email: EmailStr
-    name: str
-    password: str
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-
-# ---------------------------------------------------------
-# AUTH ROUTES
-# ---------------------------------------------------------
+# ---------------------------
+# Signup
+# ---------------------------
 @router.post("/signup")
-def signup(payload: SignupRequest, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == payload.email).first()
+def signup(email: str, password: str, full_name: str, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user = User(
-        name=payload.name,
-        email=payload.email,
-        password_hash=hash_password(payload.password),
+        email=email,
+        full_name=full_name,
+        hashed_password=hash_password(password),
         role="traveler"
     )
 
@@ -57,65 +69,64 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    token = create_token(user.id)
-
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email,
-            "role": user.role
-        }
-    }
+    return {"message": "Signup successful", "user_id": user.id}
 
 
+# ---------------------------
+# Login
+# ---------------------------
 @router.post("/login")
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
 
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-    token = create_token(user.id)
+    if not verify_password(data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Incorrect password")
+
+    token_data = {
+        "sub": str(user.id),
+        "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    }
+
+    token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email,
-            "role": user.role
-        }
+        "user_id": user.id,
+        "email": user.email,
+        "role": user.role,
+        "full_name": user.full_name
     }
 
 
-# ---------------------------------------------------------
-# AUTH DEPENDENCY: GET CURRENT TRAVELER
-# ---------------------------------------------------------
+# ---------------------------
+# Traveler Authentication Dependency
+# ---------------------------
 def get_current_traveler(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
-):
-    token = credentials.credentials
-    payload = decode_token(token)
+) -> User:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
 
-    user_id = payload.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
 
-    user = db.query(User).filter(User.id == user_id).first()
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+    user = db.query(User).filter(User.id == int(user_id)).first()
+
     if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(status_code=404, detail="User not found")
 
     if user.role != "traveler":
-        raise HTTPException(status_code=403, detail="Not a traveler")
+        raise HTTPException(status_code=403, detail="Only travelers can perform this action")
 
     return user
-
-
-
 
 

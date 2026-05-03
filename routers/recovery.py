@@ -142,14 +142,8 @@ def refund_received(order_id: int, token: str, db: Session = Depends(get_db)):
         "message": "Refund confirmed.",
     }
 
-buyer = db.query(User).filter(User.id == Order.buyer_id).first()
 
-buyer.return_count += 1
 
-if buyer.return_count >= 2:
-    buyer.status = "banned"
-
-db.commit()
 
 # ---------------------------------------------------------
 # 4. Admin repurchases item (auto)
@@ -230,22 +224,21 @@ def reroute_order(order_id: int, token: str, db: Session = Depends(get_db)):
         description="Order re-routed to new traveler",
     )
 
-    buyer = db.query(User).filter(User.id == order.buyer_id).first()
-    if buyer:
-        notify_user(
-            db=db,
-            user=buyer,
-            order_id=order.id,
-            title="Order Re-Routed",
-            message="Your order has been re-routed and will be assigned to a new traveler.",
-            event_type="order_rerouted",
-        )
+@router.post("/auto-assign/retry")
+def retry_auto_assignmentscron_cron(token: str, db: Session = Depends(get_db)):
+    admin = get_current_user(db, token)
 
-    return {
-        "status": "success",
-        "message": "Order re-routed. Matching engine will assign a new traveler.",
-    }
+    if admin.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access only")
 
+    pending_orders = (
+        db.query(Order)
+        .filter(Order.status.in_(["rerouted", "reordered"]))
+        .all()
+    )
+
+ 
+    
 
 # ---------------------------------------------------------
 # 6. Auto-assign new traveler after reroute
@@ -304,25 +297,6 @@ def auto_assign(order_id: int, token: str, db: Session = Depends(get_db)):
         "order_id": order.id,
         "traveler_id": trip.traveler_id,
     }
-
-from utils.fraud_engine import calculate_risk_score, flag_order
-
-risk = calculate_risk_score(traveler, Order)
-if risk >= 50:
-    flag_order(db, Order, "High-risk traveler assignment blocked")
-    "return" {
-        "status": "blocked",
-        "message": "Order flagged due to high-risk traveler",
-    }
-
-# Matching engine already enforces 2-week rule
-trip = find_best_traveler(db, Order)
-if not trip:
-    return {
-        "status": "pending",
-        "message": "No eligible travelers (2-week rule). System will retry.",
-    }
-
 # ---------------------------------------------------------
 # 7. CRON: Retry auto-assignment for all rerouted/reordered orders
 # ---------------------------------------------------------
@@ -338,79 +312,3 @@ def retry_auto_assignments(token: str, db: Session = Depends(get_db)):
         .filter(Order.status.in_(["rerouted", "reordered"]))
         .all()
     )
-
-    results = []
-
-    for order in pending_orders:
-        trip = find_best_traveler(db, order)
-        if not trip:
-            results.append(
-                {
-                    "order_id": order.id,
-                    "status": "no_traveler_available",
-                }
-            )
-            continue
-
-        order.traveler_id = trip.traveler_id
-        order.status = "accepted"
-        order.accepted_at = datetime.utcnow()
-        order.traveler_arrived_at = None
-        order.delivery_deadline = None
-
-        db.commit()
-        db.refresh(order)
-
-        log_event(
-            db=db,
-            order_id=order.id,
-            event_type="traveler_assigned",
-            description=f"Order auto-assigned to traveler {trip.traveler_id}",
-        )
-
-        traveler = db.query(User).filter(User.id == trip.traveler_id).first()
-        if traveler:
-            notify_user(
-                db=db,
-                user=traveler,
-                order_id=order.id,
-                title="New Delivery Assigned",
-                message=f"You have been assigned a re-routed delivery to {order.delivery_location}.",
-                event_type="traveler_assigned",
-            )
-
-        results.append(
-            {
-                "order_id": order.id,
-                "traveler_id": trip.traveler_id,
-                "status": "assigned",
-            }
-        )
-
-    return {
-        "status": "success",
-        "results": results,
-    }
-
-buyer = db.query(User).filter(User.id == Order.buyer_id).first()
-
-notify_user(
-    db=db,
-    user=buyer,
-    order_id=Order.id,
-    title="Delivery Delay",
-    message="Traveler flight was cancelled. U-KARI is re-routing your order.",
-    event_type="flight_cancelled",
-)
-
-from utils.fraud_engine import verify_flight_cancellation, flag_order
-
-if not verify_flight_cancellation(proof_filename):
-    flag_order(db, Order, "Invalid flight cancellation proof")
-    raise HTTPException(status_code=400, detail="Invalid flight cancellation proof")
-
-traveler.flight_cancel_count += 1
-db.commit()
-
-traveler.flight_cancel_count += 1
-db.commit()

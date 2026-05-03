@@ -98,6 +98,6 @@ def get_payout_details(traveler_id: int, token: str, db: Session = Depends(get_d
         .filter(Order.traveler_id == traveler_id)
         .filter(Order.status.in_(["buyer_confirmed", "paid", "refunded", "frozen"]))
         .order_by(Order.id.desc())
-        .all()
+    ).all()
 
 

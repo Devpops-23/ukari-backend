@@ -16,10 +16,3 @@ def calculate_reliability(traveler):
 
     return max(0, min(100, score))
 
-from routers import traveler
-from utils.reliability import calculate_reliability
-
-traveler.reliability_score = calculate_reliability(traveler)
-
-if traveler.reliability_score < 40:
-    traveler.status = "suspended"

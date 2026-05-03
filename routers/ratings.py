@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from db_utils.db import get_db
 from datetime import datetime
 
 
@@ -17,8 +18,8 @@ router = APIRouter(prefix="/ratings", tags=["Ratings"])
 def rate_traveler(
     order_id: int,
     rating: int,
+    token: str,
     comment: str = "",
-    token: str = Depends(get_db),
     db: Session = Depends(get_db)
 ):
     buyer = get_current_user(db, token)

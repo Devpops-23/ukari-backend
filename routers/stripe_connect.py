@@ -1,99 +1,109 @@
-import stripe
-from config import STRIPE_API_KEY
-
-stripe.api_key = STRIPE_API_KEY
-
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+import stripe
+import os
 
 from db_utils.db import get_db
-from db_utils.models import User, Order, Trip, OrderEvent
-from utils.auth import get_current_user
+from db_utils.models import User
+from auth.auth_router import get_current_traveler
 
-router = APIRouter()
+router = APIRouter(prefix="/stripe/connect", tags=["Stripe Connect"])
 
+# Load Stripe Secret Key
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+if not STRIPE_SECRET_KEY:
+    raise RuntimeError("STRIPE_SECRET_KEY is not set")
 
-router = APIRouter(
-    prefix="/stripe/connect",
-    tags=["Stripe Connect"],
-)
+stripe.api_key = STRIPE_SECRET_KEY
 
 
 # ---------------------------------------------------------
-# CREATE STRIPE CONNECT ACCOUNT FOR TRAVELER
+# CREATE CONNECTED ACCOUNT
 # ---------------------------------------------------------
 @router.post("/create-account")
-def create_connect_account(token: str, db: Session = Depends(get_db)):
-    user = get_current_user(db, token)
-
-    if user.role != "traveler":
-        raise HTTPException(status_code=403, detail="Only travelers can create Stripe accounts")
+def create_connect_account(
+    traveler: User = Depends(get_current_traveler),
+    db: Session = Depends(get_db)
+):
+    if traveler.stripe_account_id:
+        return {"message": "Account already exists", "account_id": traveler.stripe_account_id}
 
     try:
         account = stripe.Account.create(
             type="express",
-            country="US",
-            email=user.email,
-            capabilities={
-                "transfers": {"requested": True},
-            },
+            email=traveler.email,
+            capabilities={"transfers": {"requested": True}},
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-    user.stripe_account_id = account.id
+    traveler.stripe_account_id = account["id"]
     db.commit()
-    db.refresh(user)
+    db.refresh(traveler)
 
-    return {
-        "status": "success",
-        "account_id": account.id,
-    }
+    return {"account_id": account["id"]}
 
 
 # ---------------------------------------------------------
-# GENERATE ONBOARDING LINK
+# CREATE ONBOARDING LINK
 # ---------------------------------------------------------
 @router.get("/onboarding-link")
-def get_onboarding_link(token: str, db: Session = Depends(get_db)):
-    user = get_current_user(db, token)
-
-    if not user.stripe_account_id:
+def create_onboarding_link(
+    traveler: User = Depends(get_current_traveler)
+):
+    if not traveler.stripe_account_id:
         raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
 
     try:
         link = stripe.AccountLink.create(
-            account=user.stripe_account_id,
-            refresh_url="https://ukari.app/stripe/refresh",
-            return_url="https://ukari.app/stripe/return",
+            account=traveler.stripe_account_id,
+            refresh_url="https://ukari-backend-api.onrender.com/stripe/connect/refresh",
+            return_url="https://ukari-backend-api.onrender.com/stripe/connect/return",
             type="account_onboarding",
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-    return {"url": link.url}
+    return {"url": link["url"]}
 
 
 # ---------------------------------------------------------
-# CHECK ACCOUNT STATUS
+# REQUIRED BY STRIPE — REFRESH + RETURN ROUTES
 # ---------------------------------------------------------
-@router.get("/status")
-def get_connect_status(token: str, db: Session = Depends(get_db)):
-    user = get_current_user(db, token)
+@router.get("/refresh")
+def refresh():
+    return {"message": "Onboarding interrupted. Please restart onboarding."}
 
-    if not user.stripe_account_id:
+
+@router.get("/return")
+def return_to_app():
+    return {"message": "Onboarding complete. You may return to the app."}
+
+
+# ---------------------------------------------------------
+# ACCOUNT STATUS
+# ---------------------------------------------------------
+@router.get("/account-status")
+def get_account_status(
+    traveler: User = Depends(get_current_traveler)
+):
+    if not traveler.stripe_account_id:
         raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
 
     try:
-        account = stripe.Account.retrieve(user.stripe_account_id)
+        account = stripe.Account.retrieve(traveler.stripe_account_id)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
     return {
-        "charges_enabled": account.charges_enabled,
-        "payouts_enabled": account.payouts_enabled,
-        "details_submitted": account.details_submitted,
+        "charges_enabled": account["charges_enabled"],
+        "payouts_enabled": account["payouts_enabled"],
+        "details_submitted": account["details_submitted"],
     }
+
+
+
+
 
 
 

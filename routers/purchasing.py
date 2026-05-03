@@ -4,8 +4,10 @@ from sqlalchemy.orm import Session
 from db_utils.db import get_db
 from db_utils.models import User, Order, Trip, OrderEvent
 from utils.auth import get_current_user
+from utils.stripe_issuing import create_issuing_authorization, record_issuing_transaction
 
 router = APIRouter()
+
 
 
 
@@ -90,11 +92,7 @@ def confirm_purchase(order_id: int, token: str, db: Session = Depends(get_db)):
         "order_id": order.id,
         "transaction": tx,
     }
-from utils.event_logger import log_event
 
-log_event(
-    db=db,
-    order_id=order.id,
-    event_type="purchase_completed",
-    description=f"Marketplace purchase completed for {order.product_source}",
-)
+
+
+

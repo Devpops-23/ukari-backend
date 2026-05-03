@@ -1,31 +1,54 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from db_utils.db import get_db
-from db_utils.models import User, Order, Trip, OrderEvent
-from utils.auth import get_current_user
+from db_utils.models import User, Order, OrderEvent
+from auth.auth_router import get_current_traveler  # JWT-based auth
+from stripe_connect.stripe_payouts import create_traveler_payout  # your Stripe helper
 
 router = APIRouter()
 
+
+# ---------------------------------------------------------
+# Helper: Log order events
+# ---------------------------------------------------------
+def log_event(db: Session, order_id: int, event_type: str, description: str):
+    event = OrderEvent(
+        order_id=order_id,
+        event_type=event_type,
+        message=description,
+    )
+    db.add(event)
+    db.commit()
 
 
 # ---------------------------------------------------------
 # ADMIN: RELEASE TRAVELER PAYOUT AFTER DELIVERY CONFIRMED
 # ---------------------------------------------------------
 @router.post("/release/{order_id}")
-def release_traveler_payout(order_id: int, token: str, db: Session = Depends(get_db)):
-    user = get_current_user(db, token)
+def release_traveler_payout(
+    order_id: int,
+    token: str,
+    db: Session = Depends(get_db)
+):
+    # Authenticate admin
+    user = get_current_traveler(token=token, db=db)
 
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access only")
 
+    # Fetch order
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    # Enforce: payout only after buyer confirmation
+    # Enforce buyer confirmation
     if order.status != "buyer_confirmed":
-        raise HTTPException(status_code=400, detail="Order is not ready for payout (buyer has not confirmed delivery)")
+        raise HTTPException(
+            status_code=400,
+            detail="Order is not ready for payout (buyer has not confirmed delivery)"
+        )
 
     if not order.traveler_id:
         raise HTTPException(status_code=400, detail="Order has no assigned traveler")
@@ -34,7 +57,7 @@ def release_traveler_payout(order_id: int, token: str, db: Session = Depends(get
     if not traveler:
         raise HTTPException(status_code=404, detail="Traveler not found")
 
-    if not getattr(traveler, "stripe_account_id", None):
+    if not traveler.stripe_account_id:
         raise HTTPException(status_code=400, detail="Traveler has no Stripe connected account")
 
     if not order.traveler_fee:
@@ -42,7 +65,7 @@ def release_traveler_payout(order_id: int, token: str, db: Session = Depends(get
 
     amount_cents = int(round(order.traveler_fee * 100))
 
-    # Stripe Connect transfer to traveler
+    # Stripe Connect transfer
     transfer = create_traveler_payout(
         traveler_stripe_account_id=traveler.stripe_account_id,
         amount_cents=amount_cents,
@@ -55,7 +78,7 @@ def release_traveler_payout(order_id: int, token: str, db: Session = Depends(get
     db.commit()
     db.refresh(order)
 
-    # Log event BEFORE returning
+    # Log event
     log_event(
         db=db,
         order_id=order.id,
@@ -76,12 +99,3 @@ def release_traveler_payout(order_id: int, token: str, db: Session = Depends(get
             "status": transfer["status"],
         },
     }
-
-notify_user(
-    db=db,
-    user=traveler,
-    order_id=order.id,
-    title="Payout Released",
-    message=f"Your payout of ${order.traveler_fee} has been released.",
-    event_type="payout_released",
-)

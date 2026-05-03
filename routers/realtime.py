@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-
-
+from db_utils.db import get_db
 from db_utils.models import User, Order, Trip, OrderEvent
 from utils.auth import get_current_user
 
@@ -25,7 +24,11 @@ def send_notification(traveler: User, payload: dict):
 # REAL-TIME MATCHING TRIGGERED WHEN A NEW ORDER IS CREATED
 # ---------------------------------------------------------
 @router.post("/order-created/{order_id}")
-def order_created_event(order_id: int, db: Session = Depends(get_db)):
+def order_created_event(
+    order_id: int,
+    token: str,
+    db: Session = Depends(get_db)
+):
     order = db.query(Order).filter(Order.id == order_id).first()
 
     if not order:

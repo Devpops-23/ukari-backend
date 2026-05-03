@@ -16,6 +16,7 @@ def get_my_profile(traveler: User = Depends(get_current_traveler)):
     return traveler
 
 
+
 # ---------------------------------------------------------
 # GET ALL TRIPS FOR CURRENT TRAVELER
 # ---------------------------------------------------------
