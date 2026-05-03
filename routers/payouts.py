@@ -5,7 +5,7 @@ from datetime import datetime
 from db_utils.db import get_db
 from db_utils.models import User, Order, OrderEvent
 from auth.auth_router import get_current_traveler  # JWT-based auth
-from stripe_connect.stripe_payouts import create_traveler_payout  # your Stripe helper
+
 
 router = APIRouter()
 
