@@ -18,7 +18,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 # -------------------------------
 # Import models so SQLAlchemy registers them
 # -------------------------------
@@ -28,11 +27,6 @@ from db_utils.models import User, Order, Trip, OrderEvent
 # Import Base and engine AFTER models
 # -------------------------------
 from db_utils.db import Base, engine
-
-# -------------------------------
-# Create FastAPI app FIRST
-# -------------------------------
-
 
 # -------------------------------
 # Create tables AFTER app is created
@@ -56,7 +50,8 @@ from routers.matching import router as matching_router
 from routers.orders import router as orders_router
 from routers.payouts import router as payouts_router
 from routers.payouts_internal import router as payouts_internal_router
-from routers.purchasing import router as purchasing_router
+from routers.profile import router as profile_router
+ bfrom routers.purchasing import router as purchasing_router
 from routers.ratings import router as ratings_router
 from routers.realtime import router as realtime_router
 from routers.recovery import router as recovery_router
@@ -86,6 +81,7 @@ app.include_router(matching_router, prefix="/matching", tags=["Matching"])
 app.include_router(orders_router, prefix="/orders", tags=["Orders"])
 app.include_router(payouts_router, prefix="/payouts", tags=["Payouts"])
 app.include_router(payouts_internal_router, prefix="/payouts/internal", tags=["Payouts"])
+app.include_router(profile_router)
 app.include_router(purchasing_router, prefix="/purchasing", tags=["Purchasing"])
 app.include_router(ratings_router, prefix="/ratings", tags=["Ratings"])
 app.include_router(realtime_router, prefix="/realtime", tags=["Realtime"])
@@ -101,11 +97,13 @@ app.include_router(trip_earnings_router, prefix="/trip-earnings", tags=["Earning
 app.include_router(webhook_router, prefix="/webhook", tags=["Webhook"])
 
 # -------------------------------
-# Root endpoint
+# Root endpoint (optional)
 # -------------------------------
 @app.get("/")
 def root():
-    return {"status": "ok", "message": "Ukari backend running"}
+    return {"status": "ok"}
+
+
 
 
 
