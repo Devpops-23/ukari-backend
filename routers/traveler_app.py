@@ -11,7 +11,7 @@ router = APIRouter()
 # ---------------------------------------------------------
 # GET CURRENT TRAVELER PROFILE
 # ---------------------------------------------------------
-@router.get("/me", response_model=TravelerOut)
+@router.get("/profile", response_model=TravelerOut)
 def get_my_profile(traveler: User = Depends(get_current_traveler)):
     return traveler
 

@@ -51,7 +51,7 @@ from routers.orders import router as orders_router
 from routers.payouts import router as payouts_router
 from routers.payouts_internal import router as payouts_internal_router
 from routers.profile import router as profile_router
- bfrom routers.purchasing import router as purchasing_router
+from routers.purchasing import router as purchasing_router
 from routers.ratings import router as ratings_router
 from routers.realtime import router as realtime_router
 from routers.recovery import router as recovery_router
