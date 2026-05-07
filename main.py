@@ -69,6 +69,7 @@ from routers.webhook import router as webhook_router
 # Register routers
 # -------------------------------
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(profile_router, prefix="/auth", tags=["Auth"])
 app.include_router(admin_dashboard_router, prefix="/admin/dashboard", tags=["Admin"])
 app.include_router(admin_disputes_router, prefix="/admin/disputes", tags=["Admin"])
 app.include_router(admin_payouts_router, prefix="/admin/payouts", tags=["Admin"])
@@ -81,8 +82,6 @@ app.include_router(matching_router, prefix="/matching", tags=["Matching"])
 app.include_router(orders_router, prefix="/orders", tags=["Orders"])
 app.include_router(payouts_router, prefix="/payouts", tags=["Payouts"])
 app.include_router(payouts_internal_router, prefix="/payouts/internal", tags=["Payouts"])
-app.include_router(profile_router)
-app.include_router(profile_router, prefix="/auth", tags=["Auth"])
 app.include_router(purchasing_router, prefix="/purchasing", tags=["Purchasing"])
 app.include_router(ratings_router, prefix="/ratings", tags=["Ratings"])
 app.include_router(realtime_router, prefix="/realtime", tags=["Realtime"])
