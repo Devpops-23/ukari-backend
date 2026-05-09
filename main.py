@@ -37,6 +37,7 @@ Base.metadata.create_all(bind=engine)
 # Import routers safely
 # -------------------------------
 from auth.auth_router import router as auth_router
+from auth.me_router import router as me_router   # <-- NEW WORKING ROUTER
 
 from routers.admin_dashboard import router as admin_dashboard_router
 from routers.admin_disputes import router as admin_disputes_router
@@ -48,11 +49,10 @@ from routers.enforcement import router as enforcement_router
 from routers.fraud_admin import router as fraud_admin_router
 from routers.matching import router as matching_router
 from routers.orders import router as orders_router
+from routers.profile_router import router as profile_router
 from routers.payouts import router as payouts_router
 from routers.payouts_internal import router as payouts_internal_router
-from routers.profile_router import router as profile_router
 from routers.purchasing import router as purchasing_router
-from auth.me_router import router as me_router
 from routers.ratings import router as ratings_router
 from routers.realtime import router as realtime_router
 from routers.recovery import router as recovery_router
@@ -66,14 +66,13 @@ from routers.trips import router as trips_router
 from routers.trip_earnings import router as trip_earnings_router
 from routers.webhook import router as webhook_router
 
-# force redeploy
-
-
 # -------------------------------
 # Register routers
 # -------------------------------
-
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(profile_router, prefix="/auth", tags=["Auth"])
+app.include_router(me_router, prefix="/auth", tags=["Auth"])   # <-- THIS LOADS /auth/me
+
 app.include_router(admin_dashboard_router, prefix="/admin/dashboard", tags=["Admin"])
 app.include_router(admin_disputes_router, prefix="/admin/disputes", tags=["Admin"])
 app.include_router(admin_payouts_router, prefix="/admin/payouts", tags=["Admin"])
@@ -84,8 +83,6 @@ app.include_router(enforcement_router, prefix="/enforcement", tags=["Enforcement
 app.include_router(fraud_admin_router, prefix="/fraud", tags=["Fraud"])
 app.include_router(matching_router, prefix="/matching", tags=["Matching"])
 app.include_router(orders_router, prefix="/orders", tags=["Orders"])
-app.include_router(profile_router, prefix="/auth", tags=["Auth"])
-app.include_router(me_router, prefix="/auth", tags=["Auth"])
 app.include_router(payouts_router, prefix="/payouts", tags=["Payouts"])
 app.include_router(payouts_internal_router, prefix="/payouts/internal", tags=["Payouts"])
 app.include_router(purchasing_router, prefix="/purchasing", tags=["Purchasing"])
@@ -103,16 +100,8 @@ app.include_router(trip_earnings_router, prefix="/trip-earnings", tags=["Earning
 app.include_router(webhook_router, prefix="/webhook", tags=["Webhook"])
 
 # -------------------------------
-# Root endpoint (optional)
+# Root endpoint
 # -------------------------------
 @app.get("/")
 def root():
     return {"status": "ok"}
-
-
-
-
-
-
-
-
