@@ -74,9 +74,7 @@ print("🚨 ROUTERS ON SERVER:", os.listdir("routers"))
 # Register routers
 # -------------------------------
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
-app.include_router(profile_router, prefix="/auth", tags=["Auth"])
 app.include_router(me_router, prefix="/auth", tags=["Auth"])   # <-- THIS LOADS /auth/me
-
 app.include_router(admin_dashboard_router, prefix="/admin/dashboard", tags=["Admin"])
 app.include_router(admin_disputes_router, prefix="/admin/disputes", tags=["Admin"])
 app.include_router(admin_payouts_router, prefix="/admin/payouts", tags=["Admin"])
