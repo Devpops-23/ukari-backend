@@ -52,6 +52,7 @@ from routers.payouts import router as payouts_router
 from routers.payouts_internal import router as payouts_internal_router
 from routers.profile import router as profile_router
 from routers.purchasing import router as purchasing_router
+from auth.me_router import router as me_router
 from routers.ratings import router as ratings_router
 from routers.realtime import router as realtime_router
 from routers.recovery import router as recovery_router
@@ -83,6 +84,7 @@ app.include_router(enforcement_router, prefix="/enforcement", tags=["Enforcement
 app.include_router(fraud_admin_router, prefix="/fraud", tags=["Fraud"])
 app.include_router(matching_router, prefix="/matching", tags=["Matching"])
 app.include_router(orders_router, prefix="/orders", tags=["Orders"])
+app.include_router(me_router, prefix="/auth", tags=["Auth"])
 app.include_router(payouts_router, prefix="/payouts", tags=["Payouts"])
 app.include_router(payouts_internal_router, prefix="/payouts/internal", tags=["Payouts"])
 app.include_router(purchasing_router, prefix="/purchasing", tags=["Purchasing"])
