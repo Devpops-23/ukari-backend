@@ -1,16 +1,16 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from db_utils.db import get_db
+from db_utils.models import User
+from auth.auth_router import get_current_traveler
+from schemas import TravelerOut
+
 router = APIRouter()
 
-from fastapi import APIRouter, Depends
-from auth.auth_router import get_current_traveler
-
-
-
-
-@router.get("/me", tags=["Auth"])
-def get_profile(current_user = Depends(get_current_traveler)):
-
-    return {
-        "id": current_user.id,
-        "email": current_user.email,
-        "name": current_user.name
-    }
+@router.get("/me", response_model=TravelerOut)
+def get_me(
+    traveler: User = Depends(get_current_traveler),
+    db: Session = Depends(get_db)
+):
+    return traveler
