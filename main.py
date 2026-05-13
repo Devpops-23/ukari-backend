@@ -67,6 +67,7 @@ from routers.trip_earnings import router as trip_earnings_router
 from routers.webhook import router as webhook_router
 
 import os
+print("🚨 AUTH FILES:", os.listdir("auth"))
 print("🚨 ROUTERS ON SERVER:", os.listdir("routers"))
 
 

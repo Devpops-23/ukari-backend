@@ -1,3 +1,5 @@
+print("🚨 LOADED AUTH ROUTER FROM:", __file__)
+
 import email
 
 from fastapi import APIRouter, Depends, HTTPException
