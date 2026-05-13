@@ -35,6 +35,15 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+    # ---------------------------
+# Pydantic Signup Model
+# ---------------------------
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    full_name: str
+
+
 
 # ---------------------------
 # Utility functions
@@ -58,15 +67,15 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 # Signup
 # ---------------------------
 @router.post("/signup")
-def signup(email: str, password: str, full_name: str, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == email).first()
+def signup(data: SignupRequest, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user = User(
-        email=email,
-        full_name=full_name,
-        hashed_password=hash_password(password),
+        email=data.email,
+        full_name=data.full_name,
+        hashed_password=hash_password(data.password),
         role="traveler"
     )
 
@@ -75,6 +84,7 @@ def signup(email: str, password: str, full_name: str, db: Session = Depends(get_
     db.refresh(user)
 
     return {"message": "Signup successful", "user_id": user.id}
+
 
 
 # ---------------------------
