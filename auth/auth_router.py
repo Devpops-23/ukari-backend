@@ -14,7 +14,8 @@ import os
 from db_utils.db import get_db
 from db_utils.models import User
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
+router = APIRouter(tags=["Auth"])
+
 
 # ---------------------------
 # JWT CONFIG
