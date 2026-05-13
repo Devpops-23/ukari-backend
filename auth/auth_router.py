@@ -1,3 +1,5 @@
+import email
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -79,6 +81,12 @@ def signup(email: str, password: str, full_name: str, db: Session = Depends(get_
 @router.post("/login")
 def login(data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
+    
+    print("DEBUG: email received:", email)
+    print("DEBUG: user found:", user)
+    print("DEBUG: stored hash:", user.password_hash if user else None)
+    print("DEBUG: SECRET_KEY:", SECRET_KEY)
+
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -102,6 +110,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         "full_name": user.full_name
     }
 
+print("DEBUG SECRET KEY:", SECRET_KEY)
 
 # ---------------------------
 # Traveler Authentication Dependency
