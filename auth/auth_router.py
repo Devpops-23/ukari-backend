@@ -82,10 +82,11 @@ def signup(email: str, password: str, full_name: str, db: Session = Depends(get_
 def login(data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     
-    print("DEBUG: email received:", email)
+    print("DEBUG: email received:", data.email)
     print("DEBUG: user found:", user)
-    print("DEBUG: stored hash:", user.password_hash if user else None)
+    print("DEBUG: stored hash:", user.hashed_password if user else None)
     print("DEBUG: SECRET_KEY:", SECRET_KEY)
+
 
 
     if not user:
