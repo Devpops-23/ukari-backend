@@ -38,7 +38,7 @@ Base.metadata.create_all(bind=engine)
 # -------------------------------
 from auth.auth_router import router as auth_router
 from auth.me_router import router as me_router   # <-- NEW WORKING ROUTER
-
+from routers.stripe_connect import router as stripe_connect_router
 from routers.admin_dashboard import router as admin_dashboard_router
 from routers.admin_disputes import router as admin_disputes_router
 from routers.admin_payouts import router as admin_payouts_router
