@@ -1,52 +1,46 @@
 print("🚨 LOADED AUTH ROUTER FROM:", __file__)
 
-import email
+from datetime import datetime, timedelta
+import os
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
-from passlib.context import CryptContext
-from datetime import datetime, timedelta
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
+from passlib.context import CryptContext
 from pydantic import BaseModel
-import os
+from sqlalchemy.orm import Session
 
 from db_utils.db import get_db
 from db_utils.models import User
 
 router = APIRouter(tags=["Auth"])
 
-
 # ---------------------------
 # JWT CONFIG
 # ---------------------------
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")  # Correct variable for your environment
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-from fastapi.security import HTTPBearer
+if not SECRET_KEY:
+    print("🚨 WARNING: JWT_SECRET_KEY is not set in environment!")
 
 oauth2_scheme = HTTPBearer()
-
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 # ---------------------------
-# Pydantic Login Model
+# Pydantic Models
 # ---------------------------
 class LoginRequest(BaseModel):
     email: str
     password: str
 
-    # ---------------------------
-# Pydantic Signup Model
-# ---------------------------
+
 class SignupRequest(BaseModel):
     email: str
     password: str
     full_name: str
-
 
 
 # ---------------------------
@@ -80,7 +74,7 @@ def signup(data: SignupRequest, db: Session = Depends(get_db)):
         email=data.email,
         full_name=data.full_name,
         hashed_password=hash_password(data.password),
-        role="traveler"
+        role="traveler",
     )
 
     db.add(user)
@@ -90,20 +84,19 @@ def signup(data: SignupRequest, db: Session = Depends(get_db)):
     return {"message": "Signup successful", "user_id": user.id}
 
 
-
 # ---------------------------
 # Login
 # ---------------------------
 @router.post("/login")
 def login(data: LoginRequest, db: Session = Depends(get_db)):
+    print("LOGIN DEBUG: entered login function")
+    print("DEBUG SECRET KEY AT LOGIN:", SECRET_KEY)
+
     user = db.query(User).filter(User.email == data.email).first()
-    
+
     print("DEBUG: email received:", data.email)
     print("DEBUG: user found:", user)
     print("DEBUG: stored hash:", user.hashed_password if user else None)
-    print("DEBUG: SECRET_KEY:", SECRET_KEY)
-
-
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -113,7 +106,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 
     token_data = {
         "sub": str(user.id),
-        "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     }
 
     token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
@@ -124,21 +117,25 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         "user_id": user.id,
         "email": user.email,
         "role": user.role,
-        "full_name": user.full_name
+        "full_name": user.full_name,
     }
 
-print("DEBUG SECRET KEY:", SECRET_KEY)
+
+print("DEBUG SECRET KEY (module load):", SECRET_KEY)
+
 
 # ---------------------------
 # Traveler Authentication Dependency
 # ---------------------------
 def get_current_traveler(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
 ) -> User:
+    token = credentials.credentials
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
+        user_id: str | None = payload.get("sub")
 
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -155,5 +152,6 @@ def get_current_traveler(
         raise HTTPException(status_code=403, detail="Only travelers can perform this action")
 
     return user
+
 
 
