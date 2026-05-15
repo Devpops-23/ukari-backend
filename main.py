@@ -1,7 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+app = FastAPI(
+    servers=[
+        {"url": "https://ukari-backend-api.onrender.com"}
+    ]
+)
+
 
 app.add_middleware(
     CORSMiddleware,
