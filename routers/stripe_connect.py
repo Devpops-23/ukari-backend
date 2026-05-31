@@ -67,8 +67,8 @@ def create_onboarding_link(
     return {"url": link["url"]}
 
 @router.get("/update-link")
-def create_update_link(current_user: User = Depends(get_current_user)):
-    account_id = current_user.stripe_account_id
+def create_update_link(current_traveler: User = Depends(get_current_traveler)):
+    account_id = current_traveler.stripe_account_id
 
     link = stripe.AccountLink.create(
         account=account_id,
@@ -78,6 +78,7 @@ def create_update_link(current_user: User = Depends(get_current_user)):
     )
 
     return {"url": link.url}
+
 
 
 
