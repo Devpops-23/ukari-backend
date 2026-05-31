@@ -9,7 +9,9 @@ from auth.auth_router import get_current_traveler
 
 router = APIRouter(prefix="/stripe/connect", tags=["Stripe Connect"])
 
-# Load Stripe Secret Key
+# ---------------------------------------------------------
+# LOAD STRIPE SECRET KEY
+# ---------------------------------------------------------
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 if not STRIPE_SECRET_KEY:
     raise RuntimeError("STRIPE_SECRET_KEY is not set")
@@ -66,20 +68,28 @@ def create_onboarding_link(
 
     return {"url": link["url"]}
 
+
+# ---------------------------------------------------------
+# CREATE UPDATE LINK (FOR SSN LAST‑4, DOB, ETC.)
+# ---------------------------------------------------------
 @router.get("/update-link")
-def create_update_link(current_traveler: User = Depends(get_current_traveler)):
-    account_id = current_traveler.stripe_account_id
+def create_update_link(
+    traveler: User = Depends(get_current_traveler)
+):
+    if not traveler.stripe_account_id:
+        raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
 
-    link = stripe.AccountLink.create(
-        account=account_id,
-        refresh_url="https://ukari.com/reauth",
-        return_url="https://ukari.com/return",
-        type="account_update"
-    )
+    try:
+        link = stripe.AccountLink.create(
+            account=traveler.stripe_account_id,
+            refresh_url="https://ukari-backend-api.onrender.com/stripe/connect/refresh",
+            return_url="https://ukari-backend-api.onrender.com/stripe/connect/return",
+            type="account_update",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    return {"url": link.url}
-
-
+    return {"url": link["url"]}
 
 
 # ---------------------------------------------------------
@@ -115,6 +125,7 @@ def get_account_status(
         "payouts_enabled": account["payouts_enabled"],
         "details_submitted": account["details_submitted"],
     }
+
 
 
 
