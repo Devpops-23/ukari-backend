@@ -8,10 +8,8 @@ from db_utils.db import get_db
 from db_utils.models import User
 from utils.auth import get_current_user
 
-router = APIRouter(
-    prefix="/stripe/balance",
-    tags=["Stripe Balance"],
-)
+router = APIRouter(tags=["Stripe"])
+
 
 
 @router.get("/")

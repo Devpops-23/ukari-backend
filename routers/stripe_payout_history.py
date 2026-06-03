@@ -13,10 +13,8 @@ from utils.auth import get_current_user
 # Load Stripe Secret Key
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-router = APIRouter(
-    prefix="/stripe/payout",
-    tags=["Stripe Payout"],
-)
+router = APIRouter(tags=["Stripe"])
+
 
 @router.post("/")
 def create_payout(
