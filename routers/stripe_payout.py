@@ -6,10 +6,8 @@ from db_utils.db import get_db
 from db_utils.models import User
 from auth.auth_router import get_current_traveler
 
-router = APIRouter(
-    prefix="/stripe/payout",
-    tags=["Stripe Payout"]
-)
+router = APIRouter(tags=["Stripe"])
+
 
 @router.post("/")
 def create_payout(
