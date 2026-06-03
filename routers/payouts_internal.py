@@ -1,18 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+import stripe
 
 from db_utils.db import get_db
-from db_utils.models import User, Order, Trip, OrderEvent
+from db_utils.models import User
 from utils.auth import get_current_user
 
-
-
-
-router = APIRouter(
-    prefix="/internal/payouts",
-    tags=["Internal Payouts"],
-)
-
+router = APIRouter(tags=["Payouts Internal"])
 
 # ---------------------------------------------------------
 # INSTANT PAYOUT (INTERNAL ONLY)
@@ -27,14 +21,13 @@ def instant_payout(token: str, db: Session = Depends(get_db)):
     if not user.stripe_account_id:
         raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
 
-    # Get available balance on the connected account
     balance = stripe.Balance.retrieve(stripe_account=user.stripe_account_id)
 
     available = [b for b in balance["available"] if b["currency"] == "usd"]
     if not available or available[0]["amount"] <= 0:
         raise HTTPException(status_code=400, detail="No available balance to cash out")
 
-    amount = available[0]["amount"]  # in cents
+    amount = available[0]["amount"]
 
     try:
         payout = stripe.Payout.create(
@@ -85,5 +78,6 @@ def payout_history(token: str, db: Session = Depends(get_db)):
         })
 
     return {"payouts": history}
+
 
 
