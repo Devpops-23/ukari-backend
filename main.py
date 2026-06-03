@@ -74,7 +74,7 @@ from routers.webhook import router as webhook_router
 import os
 print("🚨 AUTH FILES:", os.listdir("auth"))
 print("🚨 ROUTERS ON SERVER:", os.listdir("routers"))
-
+print("🚨 USING STRIPE_PAYOUT ROUTER OBJECT:", stripe_payout_router)
 
 # -------------------------------
 # Register routers
