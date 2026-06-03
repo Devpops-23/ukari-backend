@@ -9,6 +9,39 @@ from utils.auth import get_current_user
 router = APIRouter(tags=["Payouts Internal"])
 
 # ---------------------------------------------------------
+# SIMULATE TRANSFER (adds balance to traveler)
+# ---------------------------------------------------------
+@router.post("/transfer")
+def simulate_transfer(
+    amount: int,
+    token: str,
+    db: Session = Depends(get_db)
+):
+    user = get_current_user(db, token)
+
+    if user.role != "traveler":
+        raise HTTPException(status_code=403, detail="Only travelers can receive transfers")
+
+    if not user.stripe_account_id:
+        raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
+
+    try:
+        transfer = stripe.Transfer.create(
+            amount=amount,
+            currency="usd",
+            destination=user.stripe_account_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
+
+    return {
+        "status": "success",
+        "transfer_id": transfer.id,
+        "amount": amount
+    }
+
+
+# ---------------------------------------------------------
 # INSTANT PAYOUT (INTERNAL ONLY)
 # ---------------------------------------------------------
 @router.post("/instant", include_in_schema=False)
@@ -78,6 +111,7 @@ def payout_history(token: str, db: Session = Depends(get_db)):
         })
 
     return {"payouts": history}
+
 
 
 
