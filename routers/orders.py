@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from db_utils.db import get_db
 from db_utils.models import Order, Trip, User, OrderEvent
 from utils.auth import get_current_user
+from utils.fees import calculate_fees
 
 router = APIRouter()
 
