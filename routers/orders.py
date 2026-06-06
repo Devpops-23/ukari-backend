@@ -1,71 +1,79 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
+import stripe
 
 from db_utils.db import get_db
-from db_utils.models import Order, Trip, User
+from db_utils.models import Order, Trip, User, OrderEvent
 from utils.auth import get_current_user
-from utils.fees import calculate_fees
 
 router = APIRouter()
 
 
-# ---------------------------------------------------------
-# BUYER CREATES ORDER
-# ---------------------------------------------------------
-@router.post("/create")
-def create_order(
-    item_name: str,
-    item_price: float,
-    store_name: str,
-    pickup_location: str,
-    delivery_location: str,
+@router.post("/{order_id}/buyer-confirm")
+def buyer_confirm_delivery(
+    order_id: int,
     token: str,
     db: Session = Depends(get_db)
 ):
     buyer = get_current_user(db, token)
 
-    if buyer.role != "buyer":
-        raise HTTPException(status_code=403, detail="Only buyers can create orders")
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
 
-    fees = calculate_fees(item_price)
+    if order.buyer_id != buyer.id:
+        raise HTTPException(status_code=403, detail="Not your order")
 
-    new_order = Order(
-        buyer_id=buyer.id,
-        item_name=item_name,
-        item_price=item_price,
-        store_name=store_name,
-        pickup_location=pickup_location,
-        delivery_location=delivery_location,
-        platform_fee=fees["platform_fee"],
-        traveler_fee=fees["traveler_fee"],
-        total_charged=fees["total_charged"],
-        status="pending",
-        created_at=datetime.utcnow(),
+    if order.status != "delivered":
+        raise HTTPException(status_code=400, detail="Order not delivered yet")
+
+    traveler = db.query(User).filter(User.id == order.traveler_id).first()
+    if not traveler or not traveler.stripe_account_id:
+        raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
+
+    # Traveler earnings = traveler_fee (already stored in DB)
+    amount = int(order.traveler_fee * 100)  # convert dollars → cents
+
+    try:
+        transfer = stripe.Transfer.create(
+            amount=amount,
+            currency="usd",
+            destination=traveler.stripe_account_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Stripe transfer failed: {str(e)}")
+
+    # Update order
+    order.status = "paid"
+    order.stripe_transfer_id = transfer.id
+    order.buyer_confirmed_at = datetime.utcnow()
+
+    # Update trip earnings
+    trip = db.query(Trip).filter(Trip.id == order.trip_id).first()
+    if trip:
+        trip.total_earned += order.traveler_fee
+
+    # Log event
+    event = OrderEvent(
+        order_id=order.id,
+        event_type="buyer_confirmed",
+        description=f"Buyer confirmed delivery. Transfer {transfer.id} sent to traveler.",
+        created_at=datetime.utcnow()
     )
+    db.add(event)
 
-    db.add(new_order)
     db.commit()
-    db.refresh(new_order)
+    db.refresh(order)
 
     return {
         "status": "success",
-        "order_id": new_order.id,
-        "total_charged": new_order.total_charged,
+        "order_id": order.id,
+        "transfer_id": transfer.id,
+        "amount": amount
     }
 
 
-# ---------------------------------------------------------
-# TRAVELER ACCEPTS ORDER
-# ---------------------------------------------------------
-@router.post("/{order_id}/accept")
-def accept_order(order_id: int, token: str, db: Session = Depends(get_db)):
-    user = get_current_user(db, token)
-
-    if user.role != "traveler":
-        raise HTTPException(status_code=403, detail="Only travelers can accept orders")
-
-    order = db
 
 
 
