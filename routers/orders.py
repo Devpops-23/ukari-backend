@@ -1,4 +1,3 @@
-router = APIRouter()
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -9,6 +8,7 @@ from db_utils.db import get_db
 from db_utils.models import Order, Trip, User, OrderEvent
 from utils.auth import get_current_user
 
+router = APIRouter()
 
 
 class BuyerConfirmRequest(BaseModel):
@@ -74,6 +74,7 @@ def buyer_confirm_delivery(
         "transfer_id": transfer.id,
         "amount": amount
     }
+
 
 
 
