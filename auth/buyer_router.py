@@ -15,24 +15,28 @@ router = APIRouter()
 
 
 # -------------------------------
-# Request Models
+# Signup + Login Models
 # -------------------------------
-class BuyerSignupRequest(BaseModel):
+class SignupRequest(BaseModel):
     email: str
     password: str
     full_name: str
+    role: str  # "buyer" or "traveler"
 
 
-class BuyerLoginRequest(BaseModel):
+class LoginRequest(BaseModel):
     email: str
     password: str
 
 
 # -------------------------------
-# Buyer Signup
+# SIGNUP (Buyer or Traveler)
 # -------------------------------
-@router.post("/buyer/signup")
-def buyer_signup(body: BuyerSignupRequest, db: Session = Depends(get_db)):
+@router.post("/signup")
+def signup(body: SignupRequest, db: Session = Depends(get_db)):
+
+    if body.role not in ["buyer", "traveler"]:
+        raise HTTPException(status_code=400, detail="Role must be 'buyer' or 'traveler'")
 
     existing = db.query(User).filter(User.email == body.email).first()
     if existing:
@@ -42,7 +46,7 @@ def buyer_signup(body: BuyerSignupRequest, db: Session = Depends(get_db)):
         email=body.email,
         password_hash=hash_password(body.password),
         full_name=body.full_name,
-        role="buyer",
+        role=body.role,
         created_at=datetime.utcnow()
     )
 
@@ -50,14 +54,18 @@ def buyer_signup(body: BuyerSignupRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    return {"status": "success", "buyer_id": new_user.id}
+    return {
+        "status": "success",
+        "user_id": new_user.id,
+        "role": new_user.role
+    }
 
 
 # -------------------------------
-# Buyer Login
+# LOGIN (Works for both roles)
 # -------------------------------
-@router.post("/buyer/login")
-def buyer_login(body: BuyerLoginRequest, db: Session = Depends(get_db)):
+@router.post("/login")
+def login(body: LoginRequest, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.email == body.email).first()
     if not user:
@@ -66,9 +74,6 @@ def buyer_login(body: BuyerLoginRequest, db: Session = Depends(get_db)):
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Incorrect password")
 
-    if user.role != "buyer":
-        raise HTTPException(status_code=403, detail="Not a buyer account")
-
     payload = {
         "sub": str(user.id),
         "exp": datetime.utcnow() + timedelta(days=7)
@@ -76,4 +81,8 @@ def buyer_login(body: BuyerLoginRequest, db: Session = Depends(get_db)):
 
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-    return {"status": "success", "token": token}
+    return {
+        "status": "success",
+        "token": token,
+        "role": user.role
+    }
