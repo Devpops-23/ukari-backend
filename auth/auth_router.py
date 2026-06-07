@@ -68,9 +68,9 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
 
     new_user = User(
         email=body.email,
-        hashed_password=get_password_hash(body.password),  # FIXED
+        hashed_password=get_password_hash(body.password),
         full_name=body.full_name,
-        role=body.role,  # FIXED
+        role=body.role,
         created_at=datetime.utcnow()
     )
 
@@ -135,7 +135,16 @@ def get_current_traveler(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
-    user = db.query(User
+    user = db.query(User).filter(User.id == int(user_id)).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.role != "traveler":
+        raise HTTPException(status_code=403, detail="Only travelers can perform this action")
+
+    return user
+
 
 
 
