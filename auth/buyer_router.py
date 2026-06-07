@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import datetime, timedelta
-import jwt
+from jose import jwt
+
 
 from db_utils.db import get_db
 from db_utils.models import User
