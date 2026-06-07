@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from db_utils.db import get_db
 from db_utils.models import User
+from utils.auth import get_password_hash
 
 router = APIRouter(tags=["Auth"])
 
@@ -41,6 +42,7 @@ class SignupRequest(BaseModel):
     email: str
     password: str
     full_name: str
+    role: str # "buyer" or "traveler"
 
 
 # ---------------------------
@@ -65,23 +67,32 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 # Signup
 # ---------------------------
 @router.post("/signup")
-def signup(data: SignupRequest, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == data.email).first()
+def signup(body: SignupRequest, db: Session = Depends(get_db)):
+
+    if body.role not in ["buyer", "traveler"]:
+        raise HTTPException(status_code=400, detail="Role must be 'buyer' or 'traveler'")
+
+    existing = db.query(User).filter(User.email == body.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    user = User(
-        email=data.email,
-        full_name=data.full_name,
-        hashed_password=hash_password(data.password),
-        role="traveler",
+    new_user = User(
+        email=body.email,
+        hashed_password=get_password_hash(body.password),
+        full_name=body.full_name,
+        role=body.role,  # <-- THIS NOW WORKS
+        created_at=datetime.utcnow()
     )
 
-    db.add(user)
+    db.add(new_user)
     db.commit()
-    db.refresh(user)
+    db.refresh(new_user)
 
-    return {"message": "Signup successful", "user_id": user.id}
+    return {
+        "message": "Signup successful",
+        "user_id": new_user.id
+    }
+
 
 
 # ---------------------------
