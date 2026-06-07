@@ -1,133 +1,154 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
-import os
+from pydantic import BaseModel
 
 from db_utils.db import get_db
-from db_utils.models import User, Order, Trip, OrderEvent
+from db_utils.models import Order, Trip, User, OrderEvent
 from utils.auth import get_current_user
+from utils.fees import calculate_fees
 
 router = APIRouter()
 
-# ---------------------------------------------------------
-# U-KARI FEE ENGINE (FLAT FEES)
-# ---------------------------------------------------------
 
-PLATFORM_FEE = 10.0
-TRAVELER_FEE = 25.0
-
-def calculate_fees(item_price: float):
-    platform_fee = PLATFORM_FEE
-    traveler_fee = TRAVELER_FEE
-    total_charged = item_price + platform_fee + traveler_fee
-
-    return {
-        "platform_fee": platform_fee,
-        "traveler_fee": traveler_fee,
-        "total_charged": total_charged
-    }
+# -------------------------------
+# Create Order Request Model
+# -------------------------------
+class CreateOrderRequest(BaseModel):
+    item_name: str
+    item_price: float
+    store_name: str
+    pickup_location: str
+    delivery_location: str
+    token: str
 
 
-# ---------------------------------------------------------
-# BUYER CREATES ORDER
-# ---------------------------------------------------------
+# -------------------------------
+# Buyer Creates an Order
+# -------------------------------
 @router.post("/orders/create")
 def create_order(
-    item_price: float,
-    store_name: str,
-    pickup_location: str,
-    delivery_location: str,
-    db: Session = Depends(get_db),
-    buyer: User = Depends(get_current_user)
+    body: CreateOrderRequest,
+    db: Session = Depends(get_db)
 ):
-    if buyer.status == "banned":
-        raise HTTPException(
-            status_code=403,
-            detail="Your account is restricted and cannot place orders."
-        )
+    buyer = get_current_user(db, body.token)
 
     if buyer.role != "buyer":
         raise HTTPException(status_code=403, detail="Only buyers can create orders")
 
-    fees = calculate_fees(item_price)
+    fees = calculate_fees(body.item_price)
 
-    order = Order(
+    new_order = Order(
         buyer_id=buyer.id,
-        item_price=item_price,
+        item_name=body.item_name,
+        item_price=body.item_price,
+        store_name=body.store_name,
+        pickup_location=body.pickup_location,
+        delivery_location=body.delivery_location,
         platform_fee=fees["platform_fee"],
         traveler_fee=fees["traveler_fee"],
         total_charged=fees["total_charged"],
-        store_name=store_name,
-        pickup_location=pickup_location,
-        delivery_location=delivery_location,
-        shipment_status="pending",
-        status="pending"
+        status="pending",
+        created_at=datetime.utcnow(),
     )
 
-    db.add(order)
+    db.add(new_order)
     db.commit()
-    db.refresh(order)
+    db.refresh(new_order)
 
     event = OrderEvent(
-        order_id=order.id,
-        event_type="order_created",
-        message="Order created and awaiting traveler assignment."
+        order_id=new_order.id,
+        event_type="created",
+        description="Buyer created the order.",
+        created_at=datetime.utcnow()
     )
     db.add(event)
     db.commit()
 
     return {
         "status": "success",
-        "order_id": order.id,
-        "item_price": item_price,
-        "platform_fee": fees["platform_fee"],
-        "traveler_fee": fees["traveler_fee"],
-        "total_charged": fees["total_charged"]
+        "order_id": new_order.id,
+        "total_charged": new_order.total_charged,
     }
 
 
-# ---------------------------------------------------------
-# BUYER CONFIRMS DELIVERY
-# ---------------------------------------------------------
-@router.post("/orders/{order_id}/buyer-confirm")
-def buyer_confirm_delivery(
-    order_id: int,
-    db: Session = Depends(get_db),
-    buyer: User = Depends(get_current_user)
+# -------------------------------
+# Buyer Gets All Their Orders
+# -------------------------------
+@router.get("/orders")
+def get_buyer_orders(
+    token: str,
+    db: Session = Depends(get_db)
 ):
-    order = db.query(Order).filter(Order.id == order_id).first()
+    buyer = get_current_user(db, token)
 
+    orders = (
+        db.query(Order)
+        .filter(Order.buyer_id == buyer.id)
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+
+    return {"orders": orders}
+
+
+# -------------------------------
+# Buyer Gets a Single Order
+# -------------------------------
+@router.get("/orders/{order_id}")
+def get_buyer_order(
+    order_id: int,
+    token: str,
+    db: Session = Depends(get_db)
+):
+    buyer = get_current_user(db, token)
+
+    order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
     if order.buyer_id != buyer.id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+        raise HTTPException(status_code=403, detail="Not your order")
 
-    order.status = "buyer_confirmed"
-    order.buyer_confirmed_at = datetime.utcnow()
-    order.amount_earned = order.traveler_fee
+    return order
 
-    db.commit()
 
-    traveler = db.query(User).filter(User.id == order.traveler_id).first()
+# -------------------------------
+# Buyer Cancels an Order (Optional)
+# -------------------------------
+@router.post("/orders/{order_id}/cancel")
+def cancel_order(
+    order_id: int,
+    token: str,
+    db: Session = Depends(get_db)
+):
+    buyer = get_current_user(db, token)
 
-    if traveler:
-        if order.delivered_at and order.delivery_deadline:
-            if order.delivered_at <= order.delivery_deadline:
-                traveler.on_time_deliveries += 1
-            else:
-                traveler.late_deliveries += 1
-        db.commit()
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.buyer_id != buyer.id:
+        raise HTTPException(status_code=403, detail="Not your order")
+
+    if order.status != "pending":
+        raise HTTPException(status_code=400, detail="Only pending orders can be canceled")
+
+    order.status = "canceled"
 
     event = OrderEvent(
         order_id=order.id,
-        event_type="delivery_confirmed",
-        message="Buyer confirmed delivery. Traveler payout will be released."
+        event_type="canceled",
+        description="Buyer canceled the order.",
+        created_at=datetime.utcnow()
     )
     db.add(event)
-    db.commit()
 
-    return {"status": "success", "message": "Delivery confirmed."}
+    db.commit()
+    db.refresh(order)
+
+    return {"status": "success", "order_id": order.id, "message": "Order canceled"}
+
 
 
 
