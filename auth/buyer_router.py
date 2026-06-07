@@ -46,7 +46,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
 
     new_user = User(
         email=body.email,
-        password_hash=hash_password(body.password),
+        password_hash=get_password_hash(body.password),
         full_name=body.full_name,
         role=body.role,
         created_at=datetime.utcnow()
