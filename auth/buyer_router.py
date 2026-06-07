@@ -7,7 +7,8 @@ from jose import jwt
 
 from db_utils.db import get_db
 from db_utils.models import User
-from utils.auth import hash_password, verify_password
+from utils.auth import get_password_hash, verify_password
+
 
 SECRET_KEY = "your-secret-key"
 ALGORITHM = "HS256"
