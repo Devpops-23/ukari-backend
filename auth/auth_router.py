@@ -6,13 +6,12 @@ import os
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from db_utils.db import get_db
 from db_utils.models import User
-from utils.auth import get_password_hash
+from utils.auth import get_password_hash, verify_password
 
 router = APIRouter(tags=["Auth"])
 
@@ -27,35 +26,26 @@ if not SECRET_KEY:
     print("🚨 WARNING: JWT_SECRET_KEY is not set in environment!")
 
 oauth2_scheme = HTTPBearer()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 # ---------------------------
 # Pydantic Models
 # ---------------------------
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    full_name: str
+    role: str  # "buyer" or "traveler"
+
+
 class LoginRequest(BaseModel):
     email: str
     password: str
 
 
-class SignupRequest(BaseModel):
-    email: str
-    password: str
-    full_name: str
-    role: str # "buyer" or "traveler"
-
-
 # ---------------------------
-# Utility functions
+# JWT Token Creation
 # ---------------------------
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
@@ -64,7 +54,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 
 # ---------------------------
-# Signup
+# SIGNUP
 # ---------------------------
 @router.post("/signup")
 def signup(body: SignupRequest, db: Session = Depends(get_db)):
@@ -78,9 +68,9 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
 
     new_user = User(
         email=body.email,
-        hashed_password=get_password_hash(body.password),
+        hashed_password=get_password_hash(body.password),  # FIXED
         full_name=body.full_name,
-        role=body.role,  # <-- THIS NOW WORKS
+        role=body.role,  # FIXED
         created_at=datetime.utcnow()
     )
 
@@ -94,20 +84,13 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
     }
 
 
-
 # ---------------------------
-# Login
+# LOGIN
 # ---------------------------
 @router.post("/login")
 def login(data: LoginRequest, db: Session = Depends(get_db)):
-    print("LOGIN DEBUG: entered login function")
-    print("DEBUG SECRET KEY AT LOGIN:", SECRET_KEY)
 
     user = db.query(User).filter(User.email == data.email).first()
-
-    print("DEBUG: email received:", data.email)
-    print("DEBUG: user found:", user)
-    print("DEBUG: stored hash:", user.hashed_password if user else None)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -132,16 +115,14 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     }
 
 
-print("DEBUG SECRET KEY (module load):", SECRET_KEY)
-
-
 # ---------------------------
-# Traveler Authentication Dependency
+# TRAVELER AUTH DEPENDENCY
 # ---------------------------
 def get_current_traveler(
     credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
+
     token = credentials.credentials
 
     try:
@@ -154,15 +135,7 @@ def get_current_traveler(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
-    user = db.query(User).filter(User.id == int(user_id)).first()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if user.role != "traveler":
-        raise HTTPException(status_code=403, detail="Only travelers can perform this action")
-
-    return user
+    user = db.query(User
 
 
 
