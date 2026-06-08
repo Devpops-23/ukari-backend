@@ -40,7 +40,13 @@ def create_order(
     if buyer.role != "buyer":
         raise HTTPException(status_code=403, detail="Only buyers can create orders")
 
+    # ⭐ DEBUG PRINT — BEFORE calculating fees
+    print("DEBUG: item_price received:", body.item_price)
+
     fees = calculate_fees(body.item_price)
+
+    # ⭐ DEBUG PRINT — AFTER calculating fees
+    print("DEBUG: fees calculated:", fees)
 
     new_order = Order(
         buyer_id=buyer.id,
@@ -55,6 +61,7 @@ def create_order(
         status="pending",
         created_at=datetime.utcnow(),
     )
+
 
     db.add(new_order)
     db.commit()
