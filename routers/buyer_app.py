@@ -2,13 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
 from pydantic import BaseModel
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from db_utils.db import get_db
 from db_utils.models import Order, Trip, User, OrderEvent
 from utils.auth import get_current_user
 from utils.fees import calculate_fees
 
-router = APIRouter()
+router = APIRouter(tags=["Buyer"])
+
+oauth2_scheme = HTTPBearer()
 
 
 # -------------------------------
@@ -20,7 +23,6 @@ class CreateOrderRequest(BaseModel):
     store_name: str
     pickup_location: str
     delivery_location: str
-    token: str
 
 
 # -------------------------------
@@ -29,9 +31,11 @@ class CreateOrderRequest(BaseModel):
 @router.post("/orders/create")
 def create_order(
     body: CreateOrderRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
-    buyer = get_current_user(db, body.token)
+    token = credentials.credentials
+    buyer = get_current_user(db, token)
 
     if buyer.role != "buyer":
         raise HTTPException(status_code=403, detail="Only buyers can create orders")
@@ -77,9 +81,10 @@ def create_order(
 # -------------------------------
 @router.get("/orders")
 def get_buyer_orders(
-    token: str,
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
+    token = credentials.credentials
     buyer = get_current_user(db, token)
 
     orders = (
@@ -98,9 +103,10 @@ def get_buyer_orders(
 @router.get("/orders/{order_id}")
 def get_buyer_order(
     order_id: int,
-    token: str,
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
+    token = credentials.credentials
     buyer = get_current_user(db, token)
 
     order = db.query(Order).filter(Order.id == order_id).first()
@@ -114,14 +120,15 @@ def get_buyer_order(
 
 
 # -------------------------------
-# Buyer Cancels an Order (Optional)
+# Buyer Cancels an Order
 # -------------------------------
 @router.post("/orders/{order_id}/cancel")
 def cancel_order(
     order_id: int,
-    token: str,
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
+    token = credentials.credentials
     buyer = get_current_user(db, token)
 
     order = db.query(Order).filter(Order.id == order_id).first()
@@ -148,6 +155,7 @@ def cancel_order(
     db.refresh(order)
 
     return {"status": "success", "order_id": order.id, "message": "Order canceled"}
+
 
 
 
