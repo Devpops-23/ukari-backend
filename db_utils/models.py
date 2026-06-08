@@ -12,7 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from db_utils.db import Base
-from traveler_app import get_order
+
 
 
 # ---------------------------------------------------------
