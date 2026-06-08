@@ -12,6 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from db_utils.db import Base
+from traveler_app import get_order
 
 
 # ---------------------------------------------------------
@@ -118,6 +119,7 @@ class Order(Base):
 
 
 # ---------------------------------------------------------
+# ---------------------------------------------------------
 # ORDER EVENT MODEL
 # ---------------------------------------------------------
 class OrderEvent(Base):
@@ -127,18 +129,8 @@ class OrderEvent(Base):
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
 
     event_type = Column(String, nullable=False)
+    description = Column(String, nullable=True)
     message = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     order = relationship("Order", back_populates="events")
-
-
-
-
-
-    
-
-
-
-
-
