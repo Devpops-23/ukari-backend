@@ -1,7 +1,7 @@
 print("🚨 LOADED AUTH ROUTER FROM:", __file__)
 
 from datetime import datetime, timedelta
-import os
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 from db_utils.db import get_db
 from db_utils.models import User
 from utils.auth import get_password_hash, verify_password
+
+import os
 
 router = APIRouter(tags=["Auth"])
 
@@ -43,10 +45,17 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class MeResponse(BaseModel):
+    id: int
+    email: str
+    full_name: str
+    role: str
+
+
 # ---------------------------
 # JWT Token Creation
 # ---------------------------
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
@@ -80,7 +89,8 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
 
     return {
         "message": "Signup successful",
-        "user_id": new_user.id
+        "user_id": new_user.id,
+        "role": new_user.role,
     }
 
 
@@ -116,6 +126,36 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 
 
 # ---------------------------
+# /auth/me
+# ---------------------------
+@router.get("/me", response_model=MeResponse)
+def get_me(
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    token = credentials.credentials
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str | None = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return MeResponse(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+    )
+
+
+# ---------------------------
 # TRAVELER AUTH DEPENDENCY
 # ---------------------------
 def get_current_traveler(
@@ -144,6 +184,7 @@ def get_current_traveler(
         raise HTTPException(status_code=403, detail="Only travelers can perform this action")
 
     return user
+
 
 
 
