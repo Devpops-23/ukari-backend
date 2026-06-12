@@ -40,12 +40,11 @@ def create_order(
     if buyer.role != "buyer":
         raise HTTPException(status_code=403, detail="Only buyers can create orders")
 
-    # ⭐ DEBUG PRINT — BEFORE calculating fees
+    # Debug logs
     print("DEBUG: item_price received:", body.item_price)
 
     fees = calculate_fees(body.item_price)
 
-    # ⭐ DEBUG PRINT — AFTER calculating fees
     print("DEBUG: fees calculated:", fees)
 
     new_order = Order(
@@ -62,17 +61,19 @@ def create_order(
         created_at=datetime.utcnow(),
     )
 
-
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
 
+    # Create event (message is REQUIRED by DB)
     event = OrderEvent(
         order_id=new_order.id,
         event_type="created",
         description="Buyer created the order.",
+        message="Buyer created the order.",
         created_at=datetime.utcnow()
     )
+
     db.add(event)
     db.commit()
 
@@ -154,14 +155,16 @@ def cancel_order(
         order_id=order.id,
         event_type="canceled",
         description="Buyer canceled the order.",
+        message="Buyer canceled the order.",
         created_at=datetime.utcnow()
     )
-    db.add(event)
 
+    db.add(event)
     db.commit()
     db.refresh(order)
 
     return {"status": "success", "order_id": order.id, "message": "Order canceled"}
+
 
 
 
