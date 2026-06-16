@@ -1,20 +1,42 @@
-from pydantic import BaseModel
-from datetime import datetime
 from typing import Optional
+from datetime import datetime
+from pydantic import BaseModel
 
-
-# ---------------------------------------------------------
-# TRAVELER OUT (User with role="traveler")
-# ---------------------------------------------------------
 class TravelerOut(BaseModel):
     id: int
-    name: str
+    full_name: str
     email: str
-    rating: float
-    reliability_score: float
+    role: str
+
+    stripe_account_id: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
+    default_payment_method: Optional[str] = None
+    account_verified: Optional[bool] = None
+    stripe_charges_enabled: Optional[bool] = None
+    stripe_payouts_enabled: Optional[bool] = None
+
+    shipping_address_line1: Optional[str] = None
+    shipping_address_line2: Optional[str] = None
+    shipping_city: Optional[str] = None
+    shipping_state: Optional[str] = None
+    shipping_postal_code: Optional[str] = None
+    shipping_country: Optional[str] = None
+
+    rating: Optional[float] = None
+    reliability_score: Optional[float] = None
+    on_time_deliveries: Optional[int] = None
+    late_deliveries: Optional[int] = None
+    cancellation_count: Optional[int] = None
+    flight_cancel_count: Optional[int] = None
+    chargeback_count: Optional[int] = None
+    return_count: Optional[int] = None
+
+    status: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         orm_mode = True
+
 
 
 # ---------------------------------------------------------
