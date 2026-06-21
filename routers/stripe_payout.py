@@ -6,7 +6,8 @@ from db_utils.db import get_db
 from db_utils.models import User
 from auth.auth_router import get_current_traveler
 
-router = APIRouter(tags=["Stripe"])
+router = APIRouter(prefix="/stripe", tags=["Stripe"])
+
 
 
 @router.post("/")

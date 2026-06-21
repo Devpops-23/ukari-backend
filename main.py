@@ -104,7 +104,7 @@ app.include_router(recovery_router, prefix="/recovery", tags=["Recovery"])
 
 app.include_router(stripe_balance_router, prefix="/stripe/balance", tags=["Stripe"])
 app.include_router(stripe_connect_router, prefix="/stripe/connect", tags=["Stripe"])
-app.include_router(stripe_payout_router, prefix="/stripe/payout", tags=["Stripe"])
+app.include_router(stripe_payout_router)
 app.include_router(stripe_payout_history_router, prefix="/stripe/payout-history", tags=["Stripe"])
 app.include_router(stripe_webhook_router, prefix="/stripe/webhook", tags=["Stripe"])
 
