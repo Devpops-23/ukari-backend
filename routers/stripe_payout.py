@@ -75,6 +75,43 @@ def create_transfer(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/instant")
+def instant_transfer_and_payout(
+    amount: int,
+    traveler: User = Depends(get_current_traveler)
+):
+    if not traveler.stripe_account_id:
+        raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
+
+    # STEP 1 — Transfer from platform → traveler
+    try:
+        transfer = stripe.Transfer.create(
+            amount=amount,
+            currency="usd",
+            destination=traveler.stripe_account_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Transfer failed: {str(e)}")
+
+    # STEP 2 — Payout from traveler → bank
+    try:
+        payout = stripe.Payout.create(
+            amount=amount,
+            currency="usd",
+            method="standard",
+            stripe_account=traveler.stripe_account_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Payout failed: {str(e)}")
+
+    return {
+        "status": "success",
+        "transfer_id": transfer.id,
+        "payout_id": payout.id,
+        "amount": amount,
+        "currency": "usd"
+    }
+
 
 
 
