@@ -14,11 +14,9 @@ def create_payout(
     traveler: User = Depends(get_current_traveler),
     db: Session = Depends(get_db)
 ):
-    # Traveler must have a connected account
     if not traveler.stripe_account_id:
         raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
 
-    # Retrieve balance from Stripe
     try:
         balance = stripe.Balance.retrieve(
             stripe_account=traveler.stripe_account_id
@@ -26,7 +24,6 @@ def create_payout(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
 
-    # Find available USD balance
     available_usd = next(
         (b for b in balance["available"] if b["currency"] == "usd"),
         None
@@ -37,7 +34,6 @@ def create_payout(
 
     amount = available_usd["amount"]
 
-    # Create payout
     try:
         payout = stripe.Payout.create(
             amount=amount,
@@ -54,6 +50,31 @@ def create_payout(
         "amount": amount,
         "currency": "usd"
     }
+
+
+@router.post("/transfer")
+def create_transfer(
+    amount: int,
+    traveler: User = Depends(get_current_traveler)
+):
+    if not traveler.stripe_account_id:
+        raise HTTPException(status_code=400, detail="Traveler has no Stripe account")
+
+    try:
+        transfer = stripe.Transfer.create(
+            amount=amount,
+            currency="usd",
+            destination=traveler.stripe_account_id
+        )
+        return {
+            "transfer_id": transfer.id,
+            "amount": amount,
+            "destination": traveler.stripe_account_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 
 
 
