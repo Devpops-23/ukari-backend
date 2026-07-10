@@ -20,6 +20,11 @@ app = FastAPI(
     servers=[{"url": "https://ukari-backend-api.onrender.com"}]
 )
 
+@app.get("/stripe/connect/return")
+def stripe_connect_return():
+    return {"status": "onboarding_complete"}
+
+
 # -------------------------------
 # CORS
 # -------------------------------
