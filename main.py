@@ -1,6 +1,21 @@
-from fastapi import FastAPI
+import os
+import stripe
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+# ✅ Read env *by variable name*, not by hard‑coded key values
+STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY")
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+print("PUBLIC:", STRIPE_PUBLIC_KEY)
+print("SECRET:", STRIPE_SECRET_KEY)
+print("WEBHOOK:", STRIPE_WEBHOOK_SECRET)
+
+# ✅ Initialize Stripe with secret key
+stripe.api_key = STRIPE_SECRET_KEY
+
+# ✅ Single FastAPI app definition (keep servers if you want)
 app = FastAPI(
     servers=[{"url": "https://ukari-backend-api.onrender.com"}]
 )
@@ -22,6 +37,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # -------------------------------
 # Import models so SQLAlchemy registers them
@@ -73,9 +89,7 @@ from routers.trips import router as trips_router
 from routers.trip_earnings import router as trip_earnings_router
 from routers.webhook import router as webhook_router
 
-import os
-print("🚨 AUTH FILES:", os.listdir("auth"))
-print("🚨 ROUTERS ON SERVER:", os.listdir("routers"))
+
 
 # -------------------------------
 # Register routers (clean)
