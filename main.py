@@ -3,7 +3,7 @@ import stripe
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-# ✅ Read env *by variable name*, not by hard‑coded key values
+# Load Stripe env vars
 STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
@@ -12,18 +12,30 @@ print("PUBLIC:", STRIPE_PUBLIC_KEY)
 print("SECRET:", STRIPE_SECRET_KEY)
 print("WEBHOOK:", STRIPE_WEBHOOK_SECRET)
 
-# ✅ Initialize Stripe with secret key
+# Initialize Stripe once
 stripe.api_key = STRIPE_SECRET_KEY
 
-# ✅ Single FastAPI app definition (keep servers if you want)
+# Single FastAPI app (DO NOT redefine later)
 app = FastAPI(
     servers=[{"url": "https://ukari-backend-api.onrender.com"}]
 )
 
+# -----------------------------------------
+# Stripe test transfer route (platform → connected account)
+# -----------------------------------------
+@app.post("/test-transfer")
+def test_transfer():
+    transfer = stripe.Transfer.create(
+        amount=1000,  # $10.00
+        currency="usd",
+        destination="acct_1TrVRVIhggrErJUM",  # Moses Bud's connected account
+        description="U-KARI test transfer to connected account"
+    )
+    return {"transfer": transfer}
+
 @app.get("/stripe/connect/return")
 def stripe_connect_return():
     return {"status": "onboarding_complete"}
-
 
 # -------------------------------
 # CORS
@@ -42,7 +54,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # -------------------------------
 # Import models so SQLAlchemy registers them
@@ -64,7 +75,6 @@ Base.metadata.create_all(bind=engine)
 # -------------------------------
 from auth.auth_router import router as auth_router
 from auth.me_router import router as me_router
-
 
 from routers.admin_dashboard import router as admin_dashboard_router
 from routers.admin_disputes import router as admin_disputes_router
@@ -94,14 +104,11 @@ from routers.trips import router as trips_router
 from routers.trip_earnings import router as trip_earnings_router
 from routers.webhook import router as webhook_router
 
-
-
 # -------------------------------
-# Register routers (clean)
+# Register routers
 # -------------------------------
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(me_router, prefix="/auth", tags=["Auth"])
-
 
 app.include_router(admin_dashboard_router, prefix="/admin/dashboard", tags=["Admin"])
 app.include_router(admin_disputes_router, prefix="/admin/disputes", tags=["Admin"])
@@ -138,3 +145,4 @@ app.include_router(webhook_router, prefix="/webhook", tags=["Webhook"])
 @app.get("/")
 def root():
     return {"status": "ok"}
+
