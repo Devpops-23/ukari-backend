@@ -104,6 +104,8 @@ from routers.trips import router as trips_router
 from routers.trip_earnings import router as trip_earnings_router
 from routers.webhook import router as webhook_router
 from routers import stripe_webhook
+from routers import payouts
+from routers.walmart_purchasing import router as walmart_purchasing_router
 
 # -------------------------------
 # Register routers
@@ -132,6 +134,7 @@ app.include_router(recovery_router, prefix="/recovery", tags=["Recovery"])
 app.include_router(stripe_balance_router, prefix="/stripe/balance", tags=["Stripe"])
 app.include_router(stripe_connect_router, prefix="/stripe/connect", tags=["Stripe"])
 app.include_router(stripe_payout_router)
+app.include_router(payouts.router)
 app.include_router(stripe_payout_history_router, prefix="/stripe/payout-history", tags=["Stripe"])
 app.include_router(stripe_webhook_router, prefix="/stripe/webhook", tags=["Stripe"])
 
@@ -140,6 +143,7 @@ app.include_router(trips_router, prefix="/trips", tags=["Trips"])
 app.include_router(trip_earnings_router, prefix="/trip-earnings", tags=["Earnings"])
 app.include_router(webhook_router, prefix="/webhook", tags=["Webhook"])
 app.include_router(stripe_webhook.router)
+app.include_router(walmart_purchasing_router)
 
 # -------------------------------
 # Root endpoint

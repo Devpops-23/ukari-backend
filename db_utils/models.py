@@ -83,39 +83,54 @@ class Trip(Base):
     traveler = relationship("User", back_populates="trips")
     orders = relationship("Order", back_populates="trip")
 
+    
+
+
 
 # ---------------------------------------------------------
-# ORDER MODEL
+# ORDER MODEL (FINAL VERSION FOR AMAZON + WALMART)
 # ---------------------------------------------------------
 class Order(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)
 
+    # Buyer / Traveler / Trip
     buyer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     traveler_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     trip_id = Column(Integer, ForeignKey("trips.id"), nullable=True)
 
+    # Marketplace fields
+    merchant_name = Column(String, nullable=False)  # amazon, walmart, etc.
+
+    # Pricing (Stripe uses cents)
+    item_price_cents = Column(Integer, nullable=False)
+    platform_fee_cents = Column(Integer, default=0)
+    traveler_fee_cents = Column(Integer, default=0)
+    total_charged_cents = Column(Integer, default=0)
+
+    # Item metadata
     item_name = Column(String, nullable=False)
-    item_price = Column(Float, nullable=False)
-    store_name = Column(String, nullable=False)
-    pickup_location = Column(String, nullable=False)
-    delivery_location = Column(String, nullable=False)
+    weight_lbs = Column(Float, default=0.0)
+    size_description = Column(String, default="")
+    restricted_item = Column(Boolean, default=False)
 
-    platform_fee = Column(Float, default=0.0)
-    traveler_fee = Column(Float, default=0.0)
-    total_charged = Column(Float, default=0.0)
-
+    # Status tracking
     status = Column(String, default="pending")
-
     created_at = Column(DateTime, default=datetime.utcnow)
     accepted_at = Column(DateTime, nullable=True)
     delivered_at = Column(DateTime, nullable=True)
+    buyer_confirmed_at = Column(DateTime, nullable=True)
 
+    # Stripe payout tracking
+    stripe_transfer_id = Column(String, nullable=True)
+
+    # Relationships
     buyer = relationship("User", foreign_keys=[buyer_id], back_populates="buyer_orders")
     traveler = relationship("User", foreign_keys=[traveler_id], back_populates="traveler_orders")
     trip = relationship("Trip", back_populates="orders")
     events = relationship("OrderEvent", back_populates="order", cascade="all, delete-orphan")
+
 
 
 # ---------------------------------------------------------

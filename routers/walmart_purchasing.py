@@ -44,27 +44,21 @@ def create_walmart_order(
     payload: WalmartPurchaseRequest,
     db: Session = Depends(get_db)
 ):
- order = Order(
-    item_name=payload.item_name,
-    item_price_cents=payload.item_price_cents,
-    platform_fee_cents=payload.platform_fee_cents,
-    traveler_fee_cents=payload.traveler_fee_cents,
-    total_charged_cents=(
-        payload.item_price_cents +
-        payload.platform_fee_cents +
-        payload.traveler_fee_cents
-    ),
-    weight_lbs=payload.weight_lbs,
-    size_description=payload.size_description,
-    restricted_item=payload.restricted_item,
-    buyer_id=payload.buyer_id,
-    traveler_id=payload.traveler_id,
-    trip_id=payload.trip_id,
-    merchant_name="amazon",
-    status="pending",
-    created_at=datetime.utcnow()
-)
-  
+    order = Order(
+        item_name=payload.item_name,
+        item_price_cents=payload.item_price_cents,
+        platform_fee_cents=payload.platform_fee_cents,
+        traveler_fee_cents=payload.traveler_fee_cents,
+        weight_lbs=payload.weight_lbs,
+        size_description=payload.size_description,
+        restricted_item=payload.restricted_item,
+        buyer_id=payload.buyer_id,
+        traveler_id=payload.traveler_id,
+        trip_id=payload.trip_id,
+        merchant_name="walmart",
+        status="pending",
+        created_at=datetime.utcnow()
+    )
 
     db.add(order)
 
@@ -86,11 +80,7 @@ def create_walmart_order(
 # Traveler Accept Order
 # -------------------------------
 @router.post("/{order_id}/accept")
-def accept_order(
-    order_id: int,
-    token: str,
-    db: Session = Depends(get_db)
-):
+def accept_order(order_id: int, token: str, db: Session = Depends(get_db)):
     traveler = get_current_user(db, token)
 
     if traveler.role != "traveler":
@@ -124,11 +114,7 @@ def accept_order(
 # Traveler Marks Delivered
 # -------------------------------
 @router.post("/{order_id}/deliver")
-def mark_delivered(
-    order_id: int,
-    token: str,
-    db: Session = Depends(get_db)
-):
+def mark_delivered(order_id: int, token: str, db: Session = Depends(get_db)):
     traveler = get_current_user(db, token)
 
     order = db.query(Order).filter(Order.id == order_id).first()
@@ -159,11 +145,7 @@ def mark_delivered(
 # Buyer Confirms Delivery → Stripe Transfer
 # -------------------------------
 @router.post("/{order_id}/buyer-confirm")
-def buyer_confirm_delivery(
-    order_id: int,
-    body: BuyerConfirmRequest,
-    db: Session = Depends(get_db)
-):
+def buyer_confirm_delivery(order_id: int, body: BuyerConfirmRequest, db: Session = Depends(get_db)):
     token = body.token
     buyer = get_current_user(db, token)
 
@@ -220,10 +202,7 @@ def buyer_confirm_delivery(
 # Get Order Status
 # -------------------------------
 @router.get("/{order_id}/status")
-def get_order_status(
-    order_id: int,
-    db: Session = Depends(get_db)
-):
+def get_order_status(order_id: int, db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -231,21 +210,3 @@ def get_order_status(
     return {"order_id": order.id, "status": order.status}
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
