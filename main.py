@@ -103,6 +103,7 @@ from routers.traveler_app import router as traveler_app_router
 from routers.trips import router as trips_router
 from routers.trip_earnings import router as trip_earnings_router
 from routers.webhook import router as webhook_router
+from routers import stripe_webhook
 
 # -------------------------------
 # Register routers
@@ -138,6 +139,7 @@ app.include_router(traveler_app_router, prefix="/traveler", tags=["Traveler"])
 app.include_router(trips_router, prefix="/trips", tags=["Trips"])
 app.include_router(trip_earnings_router, prefix="/trip-earnings", tags=["Earnings"])
 app.include_router(webhook_router, prefix="/webhook", tags=["Webhook"])
+app.include_router(stripe_webhook.router)
 
 # -------------------------------
 # Root endpoint
