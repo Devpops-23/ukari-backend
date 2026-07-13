@@ -44,38 +44,25 @@ def create_walmart_order(
     payload: WalmartPurchaseRequest,
     db: Session = Depends(get_db)
 ):
- order = Order(
-    item_name=payload.item_name,
-    item_price_cents=payload.item_price_cents,
-    platform_fee_cents=payload.platform_fee_cents,
-    traveler_fee_cents=payload.traveler_fee_cents,
-    total_charged_cents=(
-        payload.item_price_cents +
-        payload.platform_fee_cents +
-        payload.traveler_fee_cents
-    ),
-    weight_lbs=payload.weight_lbs,
-    size_description=payload.size_description,
-    restricted_item=payload.restricted_item,
-    buyer_id=payload.buyer_id,
-    traveler_id=payload.traveler_id,
-    trip_id=payload.trip_id,
-    merchant_name="amazon",
-    status="pending",
-    created_at=datetime.utcnow()
-)
-  
-
-@router.post("/create-order")
-def create_order(order_data: WalmartOrderCreate, db: Session = Depends(get_db)):
     order = Order(
-        buyer_id=order_data.buyer_id,
-        merchant_name=order_data.merchant_name,
-        item_name=order_data.item_name,
-        item_price_cents=order_data.item_price_cents,
-        traveler_fee_cents=order_data.traveler_fee_cents,
-        platform_fee_cents=order_data.platform_fee_cents,
-        status="created"
+        item_name=payload.item_name,
+        item_price_cents=payload.item_price_cents,
+        platform_fee_cents=payload.platform_fee_cents,
+        traveler_fee_cents=payload.traveler_fee_cents,
+        total_charged_cents=(
+            payload.item_price_cents +
+            payload.platform_fee_cents +
+            payload.traveler_fee_cents
+        ),
+        weight_lbs=payload.weight_lbs,
+        size_description=payload.size_description,
+        restricted_item=payload.restricted_item,
+        buyer_id=payload.buyer_id,
+        traveler_id=payload.traveler_id,
+        trip_id=payload.trip_id,
+        merchant_name="walmart",
+        status="pending",
+        created_at=datetime.utcnow()
     )
 
     db.add(order)
@@ -83,7 +70,6 @@ def create_order(order_data: WalmartOrderCreate, db: Session = Depends(get_db)):
     db.refresh(order)
 
     return {"order_id": order.id, "status": order.status}
-
 
 
 # -------------------------------
@@ -233,6 +219,7 @@ def get_order_status(
         raise HTTPException(status_code=404, detail="Order not found")
 
     return {"order_id": order.id, "status": order.status}
+
 
 
 
