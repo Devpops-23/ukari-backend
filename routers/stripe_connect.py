@@ -10,13 +10,11 @@ from auth.auth_router import get_current_traveler
 router = APIRouter(prefix="/stripe/connect", tags=["Stripe Connect"])
 
 # ---------------------------------------------------------
-# LOAD STRIPE SECRET KEY
+# LOAD STRIPE SECRET KEY (SAFE)
 # ---------------------------------------------------------
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
-if not STRIPE_SECRET_KEY:
-    raise RuntimeError("STRIPE_SECRET_KEY is not set")
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-stripe.api_key = STRIPE_SECRET_KEY
+
 
 
 # ---------------------------------------------------------
