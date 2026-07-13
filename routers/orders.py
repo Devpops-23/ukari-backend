@@ -66,20 +66,24 @@ def create_walmart_order(
 )
   
 
-    db.add(order)
-
-    event = OrderEvent(
-        order_id=order.id,
-        event_type="created",
-        description=f"Walmart order created for buyer {payload.buyer_id} and traveler {payload.traveler_id}.",
-        created_at=datetime.utcnow()
+@router.post("/create-order")
+def create_order(order_data: WalmartOrderCreate, db: Session = Depends(get_db)):
+    order = Order(
+        buyer_id=order_data.buyer_id,
+        merchant_name=order_data.merchant_name,
+        item_name=order_data.item_name,
+        item_price_cents=order_data.item_price_cents,
+        traveler_fee_cents=order_data.traveler_fee_cents,
+        platform_fee_cents=order_data.platform_fee_cents,
+        status="created"
     )
-    db.add(event)
 
+    db.add(order)
     db.commit()
     db.refresh(order)
 
-    return {"status": "success", "order_id": order.id}
+    return {"order_id": order.id, "status": order.status}
+
 
 
 # -------------------------------
