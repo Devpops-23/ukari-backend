@@ -1,4 +1,4 @@
-print("🚨 LOADED AUTH ROUTER FROM:", __file__)
+print("LOADED AUTH ROUTER FROM:", __file__)
 
 from datetime import datetime, timedelta
 from typing import Optional
@@ -25,7 +25,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 if not SECRET_KEY:
-    print("🚨 WARNING: JWT_SECRET_KEY is not set in environment!")
+    print("WARNING: JWT_SECRET_KEY is not set in environment!")
 
 oauth2_scheme = HTTPBearer()
 
