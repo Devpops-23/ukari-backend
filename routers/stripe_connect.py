@@ -5,7 +5,9 @@ import os
 
 from db_utils.db import get_db
 from db_utils.models import User
-from auth.auth_router import get_current_traveler
+from utils.auth import get_current_traveler  # FIXED IMPORT
+
+
 
 router = APIRouter(prefix="/stripe/connect", tags=["Stripe Connect"])
 
