@@ -14,13 +14,20 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM = "HS256"
 
 if not SECRET_KEY:
-    print("🚨 WARNING: JWT_SECRET_KEY is not set in environment!")
+ print("WARNING: JWT_SECRET_KEY is not set in environment!")
 
 # ---------------------------
 # PASSWORD HASHING
 # ---------------------------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+def get_current_traveler(db, token: str) -> User:
+    user = get_current_user(db, token)
+
+    if user.role != "traveler":
+        raise HTTPException(status_code=403, detail="Only travelers can perform this action")
+
+    return user
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
