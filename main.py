@@ -79,6 +79,7 @@ from auth.me_router import router as me_router
 from routers.admin_dashboard import router as admin_dashboard_router
 from routers.admin_disputes import router as admin_disputes_router
 from routers.admin_payouts import router as admin_payouts_router
+from routers.admin_timeline import router as admin_timeline_router
 
 from routers.buyer_app import router as buyer_app_router
 from routers.earnings import router as earnings_router
