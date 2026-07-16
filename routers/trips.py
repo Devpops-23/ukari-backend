@@ -19,7 +19,7 @@ def create_trip(
     destination: str,
     travel_date: str,
     max_weight: float,
-    
+    db: Session = Depends(get_db)
 ):
     user = get_current_user(db, token)
 
@@ -39,4 +39,5 @@ def create_trip(
     db.refresh(trip)
 
     return {"status": "success", "trip": trip}
+
 
