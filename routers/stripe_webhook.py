@@ -1,6 +1,6 @@
 import stripe
 import os
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.orm import Session
 from db_utils.db import get_db
 from db_utils.models import Order
@@ -9,10 +9,10 @@ from datetime import datetime
 router = APIRouter(prefix="/webhook", tags=["Stripe Webhook"])
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")  # set this in Render
+WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 
-@router.post("/stripe")
-async def stripe_webhook(request: Request, db: Session = get_db()):
+@router.post("/stripe", response_model=None)
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
@@ -37,7 +37,7 @@ async def stripe_webhook(request: Request, db: Session = get_db()):
                 db.commit()
 
     # -----------------------------
-    # PAYOUT PAID (SUCCESS)
+    # PAYOUT PAID
     # -----------------------------
     if event["type"] == "payout.paid":
         payout = event["data"]["object"]
@@ -64,6 +64,7 @@ async def stripe_webhook(request: Request, db: Session = get_db()):
                 db.commit()
 
     return {"status": "success"}
+
 
 
 
