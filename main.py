@@ -20,24 +20,6 @@ app = FastAPI(
 )
 
 # -----------------------------------------
-# CORS
-# -----------------------------------------
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://ukari-frontend-jjak.vercel.app",
-        "https://ukari-frontend.vercel.app",
-        "https://u-kari.com",
-        "https://www.u-kari.com",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# -----------------------------------------
 # Import models so SQLAlchemy registers them
 # -----------------------------------------
 from db_utils.models import User, Order, Trip, OrderEvent
@@ -157,6 +139,26 @@ app.include_router(payouts_internal_router, prefix="/payouts/internal", tags=["P
 
 # Webhooks
 app.include_router(webhook_router, prefix="/webhook", tags=["Webhook"])
+
+# -----------------------------------------
+# CORS
+# -----------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://ukari-frontend-jjak.vercel.app",
+        "https://ukari-frontend.vercel.app",
+        "https://u-kari.com",
+        "https://www.u-kari.com",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 # -----------------------------------------
 # Root endpoint
