@@ -14,15 +14,13 @@ router = APIRouter(
 
 @router.post("/create")
 def create_trip(
-    token: str,
     origin: str,
     destination: str,
     travel_date: str,
     max_weight: float,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    user = get_current_user(db, token)
-
     if user.role != "traveler":
         raise HTTPException(status_code=403, detail="Only travelers can create trips")
 
@@ -39,5 +37,6 @@ def create_trip(
     db.refresh(trip)
 
     return {"status": "success", "trip": trip}
+
 
 
