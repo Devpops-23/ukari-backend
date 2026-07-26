@@ -38,6 +38,13 @@ Base.metadata.create_all(bind=engine)
 # Import routers (MATCHING YOUR ACTUAL FILES)
 # -----------------------------------------
 
+# -----------------------------------------
+# Import routers (MATCHING YOUR ACTUAL FILES)
+# -----------------------------------------
+from routers.trips import router as trips_router
+
+app.include_router(trips_router, prefix="/trips", tags=["Trips"])
+
 # Auth
 from auth.auth_router import router as auth_router
 from auth.me_router import router as me_router
