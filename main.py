@@ -38,12 +38,8 @@ Base.metadata.create_all(bind=engine)
 # Import routers (MATCHING YOUR ACTUAL FILES)
 # -----------------------------------------
 
-# -----------------------------------------
-# Import routers (MATCHING YOUR ACTUAL FILES)
-# -----------------------------------------
+# Trips (IMPORTANT — only import ONCE)
 from routers.trips import router as trips_router
-
-app.include_router(trips_router, prefix="/trips", tags=["Trips"])
 
 # Auth
 from auth.auth_router import router as auth_router
@@ -61,7 +57,6 @@ from routers.traveler_app import router as traveler_app_router
 
 # Core business logic
 from routers.orders import router as orders_router
-
 from routers.matching import router as matching_router
 from routers.purchasing import router as purchasing_router
 from routers.walmart_purchasing import router as walmart_purchasing_router
@@ -98,6 +93,9 @@ from routers.webhook import router as webhook_router
 # Register routers (CLEAN ORDER)
 # -----------------------------------------
 
+# Trips (IMPORTANT — only include ONCE)
+app.include_router(trips_router, prefix="/trips", tags=["Trips"])
+
 # Auth
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(me_router, prefix="/auth", tags=["Auth"])
@@ -114,7 +112,6 @@ app.include_router(traveler_app_router, prefix="/traveler", tags=["Traveler"])
 
 # Core business logic
 app.include_router(orders_router, prefix="/orders", tags=["Orders"])
-
 app.include_router(matching_router, prefix="/matching", tags=["Matching"])
 app.include_router(purchasing_router, prefix="/purchasing", tags=["Purchasing"])
 app.include_router(walmart_purchasing_router, prefix="/walmart", tags=["Purchasing"])
@@ -165,14 +162,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
 # -----------------------------------------
 # Root endpoint
 # -----------------------------------------
 @app.get("/")
 def root():
     return {"status": "ok"}
+
 
 
 
