@@ -13,6 +13,9 @@ stripe.api_key = STRIPE_SECRET_KEY
 app = FastAPI(
     servers=[{"url": "https://ukari-backend-api.onrender.com"}]
 )
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 # -----------------------------------------
 # Import models so SQLAlchemy registers them
@@ -138,13 +141,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-def root():
-    return {"status": "ok"}
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
 
 
 
