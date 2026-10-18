@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from db_utils.db import get_db
 from db_utils.models import User, Order, OrderEvent
-from utils.auth import get_current_user
+from utils.auth import get_current_admin
 
 router = APIRouter(
-    prefix="/admin/timeline",
-    tags=["Admin Timeline"]
+    prefix="/admin",
+    tags=["Admin Timeline"],
 )
 
 # ---------------------------------------------------------
@@ -17,25 +18,26 @@ def format_event(event: OrderEvent):
     return {
         "type": event.event_type,
         "description": event.description,
-        "timestamp": event.created_at.isoformat(),
+        "timestamp": event.created_at.isoformat() if event.created_at else None,
     }
 
 
 # ---------------------------------------------------------
 # ADMIN: FULL ORDER TIMELINE (UI-READY)
 # ---------------------------------------------------------
-@router.get("/order/{order_id}")
-def get_order_timeline(order_id: int, token: str, db: Session = Depends(get_db)):
-    admin = get_current_user(db, token)
-    if admin.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access only")
-
+@router.get("/orders/{order_id}/timeline")
+@router.get("/timeline/order/{order_id}")
+def get_order_timeline(
+    order_id: int,
+    admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
     buyer = db.query(User).filter(User.id == order.buyer_id).first()
-    traveler = db.query(User).filter(User.id == order.traveler_id).first()
+    traveler = db.query(User).filter(User.id == order.traveler_id).first() if order.traveler_id else None
 
     events = (
         db.query(OrderEvent)
@@ -91,12 +93,12 @@ def get_order_timeline(order_id: int, token: str, db: Session = Depends(get_db))
 # ---------------------------------------------------------
 # ADMIN: ENFORCEMENT LOGS (UI-READY)
 # ---------------------------------------------------------
-@router.get("/enforcement-logs")
-def get_enforcement_logs(token: str, db: Session = Depends(get_db)):
-    admin = get_current_user(db, token)
-    if admin.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access only")
-
+@router.get("/enforcement/logs")
+@router.get("/timeline/enforcement-logs")
+def get_enforcement_logs(
+    admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
     events = (
         db.query(OrderEvent)
         .filter(OrderEvent.event_type.in_([
@@ -113,7 +115,7 @@ def get_enforcement_logs(token: str, db: Session = Depends(get_db)):
             "order_id": e.order_id,
             "type": e.event_type,
             "description": e.description,
-            "timestamp": e.created_at.isoformat(),
+            "timestamp": e.created_at.isoformat() if e.created_at else None,
         }
         for e in events
     ]
@@ -128,12 +130,11 @@ def get_enforcement_logs(token: str, db: Session = Depends(get_db)):
 # ---------------------------------------------------------
 # ADMIN: FINANCIAL LOGS (Purchases + Payouts)
 # ---------------------------------------------------------
-@router.get("/financial-logs")
-def get_financial_logs(token: str, db: Session = Depends(get_db)):
-    admin = get_current_user(db, token)
-    if admin.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access only")
-
+@router.get("/timeline/financial-logs")
+def get_financial_logs(
+    admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
     events = (
         db.query(OrderEvent)
         .filter(OrderEvent.event_type.in_([
@@ -150,7 +151,7 @@ def get_financial_logs(token: str, db: Session = Depends(get_db)):
             "order_id": e.order_id,
             "type": e.event_type,
             "description": e.description,
-            "timestamp": e.created_at.isoformat(),
+            "timestamp": e.created_at.isoformat() if e.created_at else None,
         }
         for e in events
     ]
