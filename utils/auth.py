@@ -1,33 +1,29 @@
 from datetime import datetime, timedelta
 import os
+from typing import Optional
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 
+from db_utils.db import get_db
 from db_utils.models import User
 
 # ---------------------------
 # JWT CONFIG
 # ---------------------------
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET") or "dev_fallback_secret_key_123456789"
 ALGORITHM = "HS256"
-
-if not SECRET_KEY:
- print("WARNING: JWT_SECRET_KEY is not set in environment!")
 
 # ---------------------------
 # PASSWORD HASHING
 # ---------------------------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def get_current_traveler(db, token: str) -> User:
-    user = get_current_user(db, token)
+oauth2_scheme = HTTPBearer(auto_error=False)
 
-    if user.role != "traveler":
-        raise HTTPException(status_code=403, detail="Only travelers can perform this action")
-
-    return user
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
@@ -40,7 +36,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 # ---------------------------
 # CREATE ACCESS TOKEN
 # ---------------------------
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(days=7))
     to_encode.update({"exp": expire})
@@ -48,11 +44,27 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 
 # ---------------------------
-# GET CURRENT USER FROM TOKEN
+# GET CURRENT USER (Dependency + Direct callable)
 # ---------------------------
-def get_current_user(db, token: str) -> User:
+def get_current_user(
+    db: Session = Depends(get_db),
+    token: Optional[str] = None,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(oauth2_scheme),
+) -> User:
+    raw_token = None
+    if credentials and credentials.credentials:
+        raw_token = credentials.credentials
+    elif token:
+        raw_token = token
+
+    if not raw_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication token required via Bearer header or token parameter",
+        )
+
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(raw_token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -66,3 +78,35 @@ def get_current_user(db, token: str) -> User:
     return user
 
 
+# ---------------------------
+# GET CURRENT TRAVELER
+# ---------------------------
+def get_current_traveler(
+    user: User = Depends(get_current_user),
+    db: Optional[Session] = None,
+    token: Optional[str] = None,
+) -> User:
+    if db is not None and token is not None:
+        user = get_current_user(db=db, token=token)
+
+    if user.role != "traveler":
+        raise HTTPException(status_code=403, detail="Only travelers can perform this action")
+
+    return user
+
+
+# ---------------------------
+# GET CURRENT ADMIN
+# ---------------------------
+def get_current_admin(
+    user: User = Depends(get_current_user),
+    db: Optional[Session] = None,
+    token: Optional[str] = None,
+) -> User:
+    if db is not None and token is not None:
+        user = get_current_user(db=db, token=token)
+
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    return user

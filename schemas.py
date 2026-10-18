@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class TravelerOut(BaseModel):
     id: int
@@ -22,21 +22,22 @@ class TravelerOut(BaseModel):
     shipping_postal_code: Optional[str] = None
     shipping_country: Optional[str] = None
 
-    rating: Optional[float] = None
-    reliability_score: Optional[float] = None
-    on_time_deliveries: Optional[int] = None
-    late_deliveries: Optional[int] = None
-    cancellation_count: Optional[int] = None
-    flight_cancel_count: Optional[int] = None
-    chargeback_count: Optional[int] = None
-    return_count: Optional[int] = None
+    rating: Optional[float] = 0.0
+    reliability_score: Optional[float] = 100.0
+    on_time_deliveries: Optional[int] = 0
+    late_deliveries: Optional[int] = 0
+    cancellation_count: Optional[int] = 0
+    flight_cancel_count: Optional[int] = 0
+    chargeback_count: Optional[int] = 0
+    return_count: Optional[int] = 0
 
-    status: Optional[str] = None
+    status: Optional[str] = "active"
     created_at: Optional[datetime] = None
 
+    model_config = ConfigDict(from_attributes=True)
     class Config:
+        from_attributes = True
         orm_mode = True
-
 
 
 # ---------------------------------------------------------
@@ -46,11 +47,16 @@ class TripOut(BaseModel):
     id: int
     origin: str
     destination: str
-    travel_date: datetime
-    status: str
-    total_earned: float
+    departure_date: Optional[datetime] = None
+    arrival_date: Optional[datetime] = None
+    travel_date: Optional[datetime] = None
+    max_weight: Optional[float] = 20.0
+    status: Optional[str] = "active"
+    total_earned: Optional[float] = 0.0
 
+    model_config = ConfigDict(from_attributes=True)
     class Config:
+        from_attributes = True
         orm_mode = True
 
 
@@ -59,9 +65,14 @@ class TripOut(BaseModel):
 # ---------------------------------------------------------
 class OrderOut(BaseModel):
     id: int
-    status: str
-    amount_earned: float
-    delivered_at: Optional[datetime]
+    status: str = "pending"
+    item_name: Optional[str] = ""
+    item_price: Optional[float] = 0.0
+    amount_earned: Optional[float] = 0.0
+    delivered_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
 
+    model_config = ConfigDict(from_attributes=True)
     class Config:
+        from_attributes = True
         orm_mode = True

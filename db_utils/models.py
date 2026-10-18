@@ -58,6 +58,10 @@ class User(Base):
     status = Column(String, default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    @property
+    def name(self):
+        return self.full_name
+
     # Relationships
     trips = relationship("Trip", back_populates="traveler", cascade="all, delete-orphan")
     traveler_orders = relationship("Order", foreign_keys="Order.traveler_id", back_populates="traveler")
@@ -75,16 +79,17 @@ class Trip(Base):
 
     origin = Column(String, nullable=False)
     destination = Column(String, nullable=False)
-    departure_date = Column(DateTime, nullable=False)
-    arrival_date = Column(DateTime, nullable=False)
+    departure_date = Column(DateTime, nullable=True)
+    arrival_date = Column(DateTime, nullable=True)
+    travel_date = Column(DateTime, nullable=True)
+    max_weight = Column(Float, default=20.0)
+    status = Column(String, default="active")
+    total_earned = Column(Float, default=0.0)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
     traveler = relationship("User", back_populates="trips")
     orders = relationship("Order", back_populates="trip")
-
-    
-
 
 
 # ---------------------------------------------------------
@@ -101,13 +106,27 @@ class Order(Base):
     trip_id = Column(Integer, ForeignKey("trips.id"), nullable=True)
 
     # Marketplace fields
-    merchant_name = Column(String, nullable=False)  # amazon, walmart, etc.
+    merchant_name = Column(String, default="walmart")  # amazon, walmart, etc.
+    store_name = Column(String, default="walmart")
+    pickup_location = Column(String, default="")
+    delivery_location = Column(String, default="")
 
     # Pricing (Stripe uses cents)
-    item_price_cents = Column(Integer, nullable=False)
+    item_price_cents = Column(Integer, default=0)
     platform_fee_cents = Column(Integer, default=0)
     traveler_fee_cents = Column(Integer, default=0)
     total_charged_cents = Column(Integer, default=0)
+
+    # Normalized float pricing
+    item_price = Column(Float, default=0.0)
+    platform_fee = Column(Float, default=0.0)
+    traveler_fee = Column(Float, default=0.0)
+    total_charged = Column(Float, default=0.0)
+    amount_earned = Column(Float, default=0.0)
+
+    @property
+    def amount(self):
+        return self.amount_earned or (self.traveler_fee_cents / 100.0 if self.traveler_fee_cents else self.item_price)
 
     # Item metadata
     item_name = Column(String, nullable=False)
@@ -121,6 +140,16 @@ class Order(Base):
     accepted_at = Column(DateTime, nullable=True)
     delivered_at = Column(DateTime, nullable=True)
     buyer_confirmed_at = Column(DateTime, nullable=True)
+    traveler_arrived_at = Column(DateTime, nullable=True)
+    delivery_deadline = Column(DateTime, nullable=True)
+    package_received_at = Column(DateTime, nullable=True)
+    proof_photo_url = Column(String, nullable=True)
+
+    # Disputes
+    dispute_reason = Column(String, nullable=True)
+    disputed_at = Column(DateTime, nullable=True)
+    dispute_status = Column(String, nullable=True)
+    dispute_created_at = Column(DateTime, nullable=True)
 
     # Stripe payout tracking
     stripe_transfer_id = Column(String, nullable=True)
