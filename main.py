@@ -38,7 +38,7 @@ Base.metadata.create_all(bind=engine)
 
 # Trips
 from routers.trips import router as trips_router
-app.include_router(trips_router, prefix="/trips", tags=["Trips"])
+app.include_router(trips_router, tags=["Trips"])
 
 # Auth
 from auth.auth_router import router as auth_router
@@ -52,17 +52,17 @@ from routers.admin_disputes import router as admin_disputes_router
 from routers.admin_payouts import router as admin_payouts_router
 from routers.admin_timeline import router as admin_timeline_router
 
-app.include_router(admin_dashboard_router, prefix="/admin/dashboard", tags=["Admin"])
-app.include_router(admin_disputes_router, prefix="/admin/disputes", tags=["Admin"])
-app.include_router(admin_payouts_router, prefix="/admin/payouts", tags=["Admin"])
-app.include_router(admin_timeline_router, prefix="/admin/timeline", tags=["Admin"])
+app.include_router(admin_dashboard_router, tags=["Admin"])
+app.include_router(admin_disputes_router, prefix="/admin", tags=["Admin"])
+app.include_router(admin_payouts_router, prefix="/admin", tags=["Admin"])
+app.include_router(admin_timeline_router, tags=["Admin"])
 
 # Buyer / Traveler
 from routers.buyer_app import router as buyer_app_router
 from routers.traveler_app import router as traveler_app_router
 
-app.include_router(buyer_app_router, prefix="/buyer", tags=["Buyer"])
-app.include_router(traveler_app_router, prefix="/traveler", tags=["Traveler"])
+app.include_router(buyer_app_router, tags=["Buyer"])
+app.include_router(traveler_app_router, tags=["Traveler"])
 
 # Core business logic
 from routers.orders import router as orders_router
@@ -71,35 +71,35 @@ from routers.purchasing import router as purchasing_router
 from routers.walmart_purchasing import router as walmart_purchasing_router
 
 app.include_router(orders_router, prefix="/orders", tags=["Orders"])
-app.include_router(matching_router, prefix="/matching", tags=["Matching"])
+app.include_router(matching_router, tags=["Matching"])
 app.include_router(purchasing_router, prefix="/purchasing", tags=["Purchasing"])
-app.include_router(walmart_purchasing_router, prefix="/walmart", tags=["Purchasing"])
+app.include_router(walmart_purchasing_router, tags=["Purchasing"])
 
 # Earnings
 from routers.earnings import router as earnings_router
 from routers.earnings_summary import router as earnings_summary_router
 from routers.trip_earnings import router as trip_earnings_router
 
-app.include_router(earnings_router, prefix="/earnings", tags=["Earnings"])
-app.include_router(earnings_summary_router, prefix="/earnings/summary", tags=["Earnings"])
-app.include_router(trip_earnings_router, prefix="/trip-earnings", tags=["Earnings"])
+app.include_router(earnings_router, tags=["Earnings"])
+app.include_router(earnings_summary_router, tags=["Earnings"])
+app.include_router(trip_earnings_router, tags=["Earnings"])
 
 # Enforcement / Fraud / Recovery
 from routers.enforcement import router as enforcement_router
 from routers.fraud_admin import router as fraud_admin_router
 from routers.recovery import router as recovery_router
 
-app.include_router(enforcement_router, prefix="/enforcement", tags=["Enforcement"])
+app.include_router(enforcement_router, tags=["Enforcement"])
 app.include_router(fraud_admin_router, prefix="/fraud", tags=["Fraud"])
-app.include_router(recovery_router, prefix="/recovery", tags=["Recovery"])
+app.include_router(recovery_router, tags=["Recovery"])
 
 # Ratings / Realtime / Profile
 from routers.ratings import router as ratings_router
 from routers.realtime import router as realtime_router
 from routers.profile_router import router as profile_router
 
-app.include_router(ratings_router, prefix="/ratings", tags=["Ratings"])
-app.include_router(realtime_router, prefix="/realtime", tags=["Realtime"])
+app.include_router(ratings_router, tags=["Ratings"])
+app.include_router(realtime_router, tags=["Realtime"])
 app.include_router(profile_router, prefix="/profile", tags=["Profile"])
 
 # Stripe
@@ -110,10 +110,10 @@ from routers.stripe_payout_history import router as stripe_payout_history_router
 from routers.stripe_webhook import router as stripe_webhook_router
 
 app.include_router(stripe_balance_router, prefix="/stripe/balance", tags=["Stripe"])
-app.include_router(stripe_connect_router, prefix="/stripe/connect", tags=["Stripe"])
-app.include_router(stripe_payout_router, prefix="/stripe/payout", tags=["Stripe"])
+app.include_router(stripe_connect_router, tags=["Stripe"])
+app.include_router(stripe_payout_router, tags=["Stripe"])
 app.include_router(stripe_payout_history_router, prefix="/stripe/payout-history", tags=["Stripe"])
-app.include_router(stripe_webhook_router, prefix="/stripe/webhook", tags=["Stripe"])
+app.include_router(stripe_webhook_router, prefix="/stripe", tags=["Stripe"])
 
 # Internal payouts engine
 from routers.payouts_internal import router as payouts_internal_router

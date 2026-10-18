@@ -35,9 +35,6 @@ class TravelerOut(BaseModel):
     created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
-    class Config:
-        from_attributes = True
-        orm_mode = True
 
 
 # ---------------------------------------------------------
@@ -55,9 +52,6 @@ class TripOut(BaseModel):
     total_earned: Optional[float] = 0.0
 
     model_config = ConfigDict(from_attributes=True)
-    class Config:
-        from_attributes = True
-        orm_mode = True
 
 
 # ---------------------------------------------------------
@@ -73,6 +67,3 @@ class OrderOut(BaseModel):
     created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
-    class Config:
-        from_attributes = True
-        orm_mode = True
