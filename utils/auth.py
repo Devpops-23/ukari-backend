@@ -82,12 +82,17 @@ def get_current_user(
 # GET CURRENT TRAVELER
 # ---------------------------
 def get_current_traveler(
-    user: User = Depends(get_current_user),
-    db: Optional[Session] = None,
-    token: Optional[str] = None,
+    user: Optional[User] = Depends(get_current_user),
+    *args,
+    **kwargs,
 ) -> User:
-    if db is not None and token is not None:
-        user = get_current_user(db=db, token=token)
+    if not isinstance(user, User):
+        db = kwargs.get("db") or (args[0] if len(args) > 0 and isinstance(args[0], Session) else None)
+        token = kwargs.get("token") or (args[1] if len(args) > 1 else (args[0] if len(args) > 0 and isinstance(args[0], str) else None))
+        if db:
+            user = get_current_user(db=db, token=token)
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
 
     if user.role != "traveler":
         raise HTTPException(status_code=403, detail="Only travelers can perform this action")
@@ -99,14 +104,43 @@ def get_current_traveler(
 # GET CURRENT ADMIN
 # ---------------------------
 def get_current_admin(
-    user: User = Depends(get_current_user),
-    db: Optional[Session] = None,
-    token: Optional[str] = None,
+    user: Optional[User] = Depends(get_current_user),
+    *args,
+    **kwargs,
 ) -> User:
-    if db is not None and token is not None:
-        user = get_current_user(db=db, token=token)
+    if not isinstance(user, User):
+        db = kwargs.get("db") or (args[0] if len(args) > 0 and isinstance(args[0], Session) else None)
+        token = kwargs.get("token") or (args[1] if len(args) > 1 else (args[0] if len(args) > 0 and isinstance(args[0], str) else None))
+        if db:
+            user = get_current_user(db=db, token=token)
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
 
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
+
+    return user
+
+get_current_admin_user = get_current_admin
+
+
+# ---------------------------
+# GET CURRENT BUYER
+# ---------------------------
+def get_current_buyer(
+    user: Optional[User] = Depends(get_current_user),
+    *args,
+    **kwargs,
+) -> User:
+    if not isinstance(user, User):
+        db = kwargs.get("db") or (args[0] if len(args) > 0 and isinstance(args[0], Session) else None)
+        token = kwargs.get("token") or (args[1] if len(args) > 1 else (args[0] if len(args) > 0 and isinstance(args[0], str) else None))
+        if db:
+            user = get_current_user(db=db, token=token)
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+    if user.role != "buyer":
+        raise HTTPException(status_code=403, detail="Only buyers can perform this action")
 
     return user
