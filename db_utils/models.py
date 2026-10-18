@@ -150,6 +150,7 @@ class Order(Base):
     disputed_at = Column(DateTime, nullable=True)
     dispute_status = Column(String, nullable=True)
     dispute_created_at = Column(DateTime, nullable=True)
+    refunded_at = Column(DateTime, nullable=True)
 
     # Stripe payout tracking
     stripe_transfer_id = Column(String, nullable=True)
