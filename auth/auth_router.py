@@ -20,7 +20,7 @@ router = APIRouter(tags=["Auth"])
 # ---------------------------
 # JWT CONFIG
 # ---------------------------
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET") or "dev_fallback_secret_key_123456789"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
