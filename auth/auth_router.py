@@ -68,8 +68,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 @router.post("/signup")
 def signup(body: SignupRequest, db: Session = Depends(get_db)):
 
-    if body.role not in ["buyer", "traveler"]:
-        raise HTTPException(status_code=400, detail="Role must be 'buyer' or 'traveler'")
+    if body.role not in ["buyer", "traveler", "admin"]:
+        raise HTTPException(status_code=400, detail="Role must be 'buyer', 'traveler', or 'admin'")
 
     existing = db.query(User).filter(User.email == body.email).first()
     if existing:

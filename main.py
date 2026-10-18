@@ -25,12 +25,13 @@ from db_utils.models import User, Order, Trip, OrderEvent
 # -----------------------------------------
 # Import Base and engine AFTER models
 # -----------------------------------------
-from db_utils.db import Base, engine
+from db_utils.db import Base, engine, ensure_schema_migrations
 
 # -----------------------------------------
-# Create tables
+# Create tables and ensure migrations
 # -----------------------------------------
 Base.metadata.create_all(bind=engine)
+ensure_schema_migrations(engine)
 
 # -----------------------------------------
 # Routers
