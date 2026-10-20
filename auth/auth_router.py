@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError, jwt
+from jose import JWTError, jwt, ExpiredSignatureError
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -22,7 +22,7 @@ router = APIRouter(tags=["Auth"])
 # ---------------------------
 SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET") or "dev_fallback_secret_key_123456789"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 if not SECRET_KEY:
     print("WARNING: JWT_SECRET_KEY is not set in environment!")
@@ -140,6 +140,8 @@ def get_me(
         user_id: str | None = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
@@ -172,6 +174,8 @@ def get_current_traveler(
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
 
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
