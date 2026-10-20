@@ -157,6 +157,48 @@ def get_me(
     )
 
 
+class SwitchRoleRequest(BaseModel):
+    role: str
+
+
+@router.post("/switch-role")
+def switch_role(
+    body: SwitchRoleRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_role = body.role.lower().strip()
+    if new_role not in ["traveler", "buyer"]:
+        raise HTTPException(status_code=400, detail="Role must be 'traveler' or 'buyer'")
+
+    user.role = new_role
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "status": "success",
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": user.role,
+    }
+
+
 # ---------------------------
 # TRAVELER AUTH DEPENDENCY
 # ---------------------------

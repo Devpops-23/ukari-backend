@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 class TravelerOut(BaseModel):
     id: int
@@ -52,6 +52,21 @@ class TripOut(BaseModel):
     total_earned: Optional[float] = 0.0
 
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def trip_id(self) -> int:
+        return self.id
+
+    @computed_field
+    @property
+    def origin_city(self) -> str:
+        return self.origin
+
+    @computed_field
+    @property
+    def destination_city(self) -> str:
+        return self.destination
 
 
 # ---------------------------------------------------------
