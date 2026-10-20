@@ -15,10 +15,13 @@ router = APIRouter(
 
 
 class CreateTripRequest(BaseModel):
-    origin: str
-    destination: str
-    travel_date: str
-    max_weight: float = 20.0
+    origin: Optional[str] = None
+    destination: Optional[str] = None
+    travel_date: Optional[str] = None
+    origin_city: Optional[str] = None
+    destination_city: Optional[str] = None
+    departure_date: Optional[str] = None
+    max_weight: Optional[float] = 20.0
 
 
 @router.post("/create")
@@ -27,30 +30,69 @@ def create_trip(
     origin: Optional[str] = None,
     destination: Optional[str] = None,
     travel_date: Optional[str] = None,
+    origin_city: Optional[str] = None,
+    destination_city: Optional[str] = None,
+    departure_date: Optional[str] = None,
     max_weight: Optional[float] = 20.0,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if user.role != "traveler":
-        raise HTTPException(status_code=403, detail="Only travelers can create trips")
+    if user.role not in ["traveler", "admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Only travelers can create trips (your role is '{user.role}')",
+        )
 
-    trip_origin = body.origin if body else origin
-    trip_dest = body.destination if body else destination
-    trip_date_str = body.travel_date if body else travel_date
-    trip_weight = body.max_weight if body else (max_weight or 20.0)
+    trip_origin = (
+        (body.origin if body and body.origin else None)
+        or (body.origin_city if body and body.origin_city else None)
+        or origin
+        or origin_city
+    )
+    trip_dest = (
+        (body.destination if body and body.destination else None)
+        or (body.destination_city if body and body.destination_city else None)
+        or destination
+        or destination_city
+    )
+    trip_date_str = (
+        (body.travel_date if body and body.travel_date else None)
+        or (body.departure_date if body and body.departure_date else None)
+        or travel_date
+        or departure_date
+    )
+    trip_weight = (
+        (body.max_weight if body and body.max_weight is not None else None)
+        or (max_weight if max_weight is not None else 20.0)
+    )
 
     if not trip_origin or not trip_dest or not trip_date_str:
         raise HTTPException(
             status_code=400,
-            detail="origin, destination, and travel_date are required",
+            detail="origin, destination, and departure_date are required",
         )
 
     parsed_date = None
-    try:
-        parsed_date = datetime.fromisoformat(trip_date_str.replace("Z", "+00:00"))
-    except Exception:
+    cleaned_date = trip_date_str.strip().replace("Z", "+00:00")
+    for fmt in (
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d",
+        "%d/%m/%Y, %I:%M %p",
+        "%d/%m/%Y %H:%M",
+        "%d/%m/%Y",
+        "%m/%d/%Y",
+    ):
         try:
-            parsed_date = datetime.strptime(trip_date_str, "%Y-%m-%d")
+            parsed_date = datetime.strptime(cleaned_date, fmt)
+            break
+        except Exception:
+            pass
+
+    if not parsed_date:
+        try:
+            parsed_date = datetime.fromisoformat(cleaned_date)
         except Exception:
             parsed_date = datetime.utcnow()
 
