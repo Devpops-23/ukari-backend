@@ -17,6 +17,52 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY")
 
 
 # ---------------------------------------------------------
+# HELPER FUNCTIONS
+# ---------------------------------------------------------
+def ensure_stripe_account(traveler: User, db: Session) -> str:
+    # If account is a mock or missing, and we have a valid stripe API key, create real Stripe account
+    if not traveler.stripe_account_id or traveler.stripe_account_id.startswith("acct_mock_"):
+        if stripe.api_key:
+            try:
+                account = stripe.Account.create(
+                    type="express",
+                    email=traveler.email,
+                    capabilities={"transfers": {"requested": True}},
+                )
+                traveler.stripe_account_id = account["id"]
+                db.commit()
+                db.refresh(traveler)
+                return traveler.stripe_account_id
+            except Exception as e:
+                print("Failed to create real Stripe account:", e)
+
+        if not traveler.stripe_account_id:
+            traveler.stripe_account_id = f"acct_mock_{traveler.id}"
+            db.commit()
+            db.refresh(traveler)
+
+    return traveler.stripe_account_id
+
+
+def get_onboarding_url(traveler: User, return_path: str = "/dashboard/payouts") -> str:
+    if stripe.api_key and traveler.stripe_account_id and not traveler.stripe_account_id.startswith("acct_mock_"):
+        try:
+            link = stripe.AccountLink.create(
+                account=traveler.stripe_account_id,
+                refresh_url=f"http://localhost:3000{return_path}",
+                return_url=f"http://localhost:3000{return_path}?status=success",
+                type="account_onboarding",
+            )
+            return link["url"]
+        except Exception as e:
+            print("Failed to create Stripe AccountLink:", e)
+
+    # In fallback or mock mode, never redirect to a fake client_id on connect.stripe.com
+    # as Stripe returns 'multi_region_routing_target_not_found'. Safely return to app:
+    return f"http://localhost:3000{return_path}?status=success"
+
+
+# ---------------------------------------------------------
 # CREATE CONNECTED ACCOUNT
 # ---------------------------------------------------------
 @router.post("/stripe/connect/create-account")
@@ -25,28 +71,7 @@ def create_connect_account(
     traveler: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if traveler.stripe_account_id:
-        return {"message": "Account already exists", "account_id": traveler.stripe_account_id}
-
-    account_id = None
-    if stripe.api_key:
-        try:
-            account = stripe.Account.create(
-                type="express",
-                email=traveler.email,
-                capabilities={"transfers": {"requested": True}},
-            )
-            account_id = account["id"]
-        except Exception as e:
-            # Fallback for dev / mock
-            account_id = f"acct_mock_{traveler.id}"
-    else:
-        account_id = f"acct_mock_{traveler.id}"
-
-    traveler.stripe_account_id = account_id
-    db.commit()
-    db.refresh(traveler)
-
+    account_id = ensure_stripe_account(traveler, db)
     return {"account_id": account_id}
 
 
@@ -59,36 +84,9 @@ def onboard_user(
     traveler: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not traveler.stripe_account_id:
-        if stripe.api_key:
-            try:
-                account = stripe.Account.create(
-                    type="express",
-                    email=traveler.email,
-                    capabilities={"transfers": {"requested": True}},
-                )
-                traveler.stripe_account_id = account["id"]
-            except Exception:
-                traveler.stripe_account_id = f"acct_mock_{traveler.id}"
-        else:
-            traveler.stripe_account_id = f"acct_mock_{traveler.id}"
-        db.commit()
-        db.refresh(traveler)
-
-    url = f"https://connect.stripe.com/express/oauth/authorize?response_type=code&client_id=ca_mock&scope=read_write&state={traveler.id}"
-    if stripe.api_key and not traveler.stripe_account_id.startswith("acct_mock_"):
-        try:
-            link = stripe.AccountLink.create(
-                account=traveler.stripe_account_id,
-                refresh_url="http://localhost:3000/dashboard/payouts",
-                return_url="http://localhost:3000/dashboard/payouts?status=success",
-                type="account_onboarding",
-            )
-            url = link["url"]
-        except Exception:
-            pass
-
-    return {"status": "success", "url": url, "account_id": traveler.stripe_account_id}
+    account_id = ensure_stripe_account(traveler, db)
+    url = get_onboarding_url(traveler, return_path="/dashboard/payouts")
+    return {"status": "success", "url": url, "account_id": account_id}
 
 
 # ---------------------------------------------------------
@@ -99,12 +97,32 @@ def onboard_user(
 def get_stripe_status(
     traveler: User = Depends(get_current_user),
 ):
+    account_id = traveler.stripe_account_id or ""
+    charges_enabled = False
+    payouts_enabled = False
+    details_submitted = False
+
+    if stripe.api_key and account_id and not account_id.startswith("acct_mock_"):
+        try:
+            acct = stripe.Account.retrieve(account_id)
+            charges_enabled = acct.get("charges_enabled", False)
+            payouts_enabled = acct.get("payouts_enabled", False)
+            details_submitted = acct.get("details_submitted", False)
+        except Exception:
+            pass
+    elif account_id.startswith("acct_mock_"):
+        charges_enabled = True
+        payouts_enabled = True
+        details_submitted = True
+
+    status_str = "active" if (payouts_enabled or details_submitted) else ("pending" if account_id else "not_connected")
+
     return {
-        "status": "active" if traveler.stripe_account_id else "not_connected",
-        "account_id": traveler.stripe_account_id or "",
-        "charges_enabled": bool(traveler.stripe_account_id),
-        "payouts_enabled": bool(traveler.stripe_account_id),
-        "details_submitted": bool(traveler.stripe_account_id),
+        "status": status_str,
+        "account_id": account_id,
+        "charges_enabled": charges_enabled,
+        "payouts_enabled": payouts_enabled,
+        "details_submitted": details_submitted,
     }
 
 
@@ -119,24 +137,8 @@ def create_onboarding_link(
     traveler: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not traveler.stripe_account_id:
-        traveler.stripe_account_id = f"acct_mock_{traveler.id}"
-        db.commit()
-        db.refresh(traveler)
-
-    url = f"https://connect.stripe.com/express/oauth/authorize?response_type=code&client_id=ca_mock&scope=read_write&state={traveler.id}"
-    if stripe.api_key and not traveler.stripe_account_id.startswith("acct_mock_"):
-        try:
-            link = stripe.AccountLink.create(
-                account=traveler.stripe_account_id,
-                refresh_url="http://localhost:3000/traveler/onboarding",
-                return_url="http://localhost:3000/traveler/onboarding?complete=1",
-                type="account_onboarding",
-            )
-            url = link["url"]
-        except Exception:
-            pass
-
+    ensure_stripe_account(traveler, db)
+    url = get_onboarding_url(traveler, return_path="/traveler/onboarding")
     return {"url": url}
 
 
