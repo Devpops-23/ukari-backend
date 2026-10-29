@@ -82,7 +82,7 @@ class Trip(Base):
     departure_date = Column(DateTime, nullable=True)
     arrival_date = Column(DateTime, nullable=True)
     travel_date = Column(DateTime, nullable=True)
-    max_weight = Column(Float, default=20.0)
+    max_weight = Column(Float, default=10.0)
     status = Column(String, default="active")
     total_earned = Column(Float, default=0.0)
 

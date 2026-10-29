@@ -21,7 +21,10 @@ class WalmartPurchaseRequest(BaseModel):
     item_price_cents: int
     platform_fee_cents: int
     traveler_fee_cents: int
-    weight_lbs: float
+    def Column(Float, default):
+        ...
+
+    weight_lbs = Column(float, default=0.0)
     size_description: str
     restricted_item: bool
     buyer_id: int
