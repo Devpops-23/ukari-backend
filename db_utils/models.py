@@ -34,7 +34,8 @@ class User(Base):
     account_verified = Column(Boolean, default=False)
     stripe_charges_enabled = Column(Boolean, default=False)
     stripe_payouts_enabled = Column(Boolean, default=False)
-
+    stripe_payment_intent_id = Column(String, nullable=True)
+   
     # Traveler shipping address
     shipping_address_line1 = Column(String, nullable=True)
     shipping_address_line2 = Column(String, nullable=True)
@@ -82,7 +83,8 @@ class Trip(Base):
     departure_date = Column(DateTime, nullable=True)
     arrival_date = Column(DateTime, nullable=True)
     travel_date = Column(DateTime, nullable=True)
-    max_weight = Column(Float, default=10.0)
+    # Traveller declares their own carrying capacity.
+    max_weight = Column(Float, nullable=True, default=None)
     status = Column(String, default="active")
     total_earned = Column(Float, default=0.0)
 

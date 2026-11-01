@@ -14,7 +14,7 @@ from db_utils.models import User
 # ---------------------------
 # JWT CONFIG
 # ---------------------------
-SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET") or "dev_fallback_secret_key_123456789"
+SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET") or "dev_fallback_secret_key_6TFQfWNH4_nxgEkt19LHXYgjjtaIyejT7VUdP6OCuZYLZTHwI59WIhPltFtYTAvljefoMC98DrG7pvpOVMLwJQ"
 ALGORITHM = "HS256"
 
 # ---------------------------
